@@ -63,13 +63,23 @@ export function DemoPage() {
   const [phoneKey, setPhoneKey] = useState<string | null>(null)
   const fieldVehicle = vehicleId ?? scripted ?? vehicles?.[0]?.vehicle_id ?? null
 
-  // lowest priority on the scripted bus; if nobody holds a seat there any more, the highest-ranked group that holds one anywhere
-  const followed = useMemo(() => {
+  // The lowest-priority group holding a seat on the scripted bus. When that bus is reported overcrowded every group on it loses its seat; the
+  // higher-priority ones get the few spare seats on other buses first, so this passenger has no seat until the depot's extra bus arrives, then
+  // is moved onto it and told ("moved to ..."). Every displaced group gets a seat once the extra bus is there, so this never ends as "seat lost".
+  // If nobody holds a seat there, the highest-ranked group holding one anywhere.
+  const candidate = useMemo(() => {
     const held = (passengers?.items ?? []).filter((p) => p.allocation)
     const onBus = held.filter((p) => p.allocation?.vehicle_id === scripted).sort((a, b) => (b.rank ?? 0) - (a.rank ?? 0))
     const pick = onBus[0] ?? held.sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0))[0]
     return pick ? { key: pick.pnr ?? pick.group_id, onBus: onBus.length > 0 } : null
   }, [passengers, scripted])
+  // Latched: once chosen the pane keeps following the same passenger while allocations change under it. It re-chooses only if that
+  // passenger is not in a newly loaded scenario (the list is complete when it is not paged).
+  const [followed, setFollowed] = useState<{ key: string; onBus: boolean } | null>(null)
+  const complete = passengers ? passengers.items.length >= passengers.total : false
+  const stillThere = followed && passengers ? passengers.items.some((p) => (p.pnr ?? p.group_id) === followed.key) : true
+  if (followed === null && candidate) setFollowed(candidate)
+  else if (followed && complete && !stillThere) setFollowed(candidate)
   const phone = phoneKey ?? followed?.key ?? null
 
   return (

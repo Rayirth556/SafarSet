@@ -13,7 +13,7 @@ from .diff import build_diff
 from .planner import propose_plan, submit_plan
 
 # Events after which the set of feasible placements may have changed.
-REPLAN_ON = {"TRAIN_CANCELLED", "TRAIN_DELAYED", "ROAD_CLOSED", "VACANCY_UPDATE", "NOSHOWS_REPORTED", "LOAD_REPORT",
+REPLAN_ON = {"TRAIN_CANCELLED", "TRAIN_DELAYED", "ROAD_CLOSED", "VACANCY_UPDATE", "NOSHOWS_REPORTED", "LOAD_REPORT", "VEHICLE_DEPLOYED",
              "BUFFER_CHANGED", "PASSENGER_DISPLACED", "OPERATOR_OVERRIDE", "GROUP_SELF_BOARDED"}
 
 

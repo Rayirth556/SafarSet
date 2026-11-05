@@ -125,17 +125,25 @@ def test_wheelchair_groups_have_an_accessible_vehicle(sc):
 
 def test_timeline(sc):
     steps = sc["timeline"]["steps"]
-    assert [s["type"] for s in steps] == ["TRAIN_CANCELLED", "PLAN_PROPOSED", "APPROVE_BATCH", "LOAD_REPORT",
-                                          "NOSHOWS_REPORTED", "PLAN_PROPOSED", "APPROVE_BATCH"]
+    assert [s["type"] for s in steps] == ["TRAIN_CANCELLED", "APPROVE_BATCH", "LOAD_REPORT", "VEHICLE_DEPLOYED",
+                                          "APPROVE_BATCH", "NOSHOWS_REPORTED", "APPROVE_BATCH"]
     assert [s["at_min"] for s in steps] == sorted(s["at_min"] for s in steps)
     vehicles = {v["vehicle_id"]: v for v in sc["vehicles"]}
-    over, noshow = steps[3]["payload"], steps[4]["payload"]
+    over, deploy, noshow = steps[2]["payload"], steps[3]["payload"]["vehicle"], steps[5]["payload"]
     assert over["level"] == "OVERCROWDED" and over["count"] > vehicles[over["vehicle_id"]]["pools"][0]["nominal"]
-    assert vehicles[over["vehicle_id"]]["depart_min"] > steps[3]["at_min"]            # reported before boarding
-    assert vehicles[noshow["vehicle_id"]]["depart_min"] > steps[4]["at_min"]          # train has not left yet
+    assert vehicles[over["vehicle_id"]]["depart_min"] > steps[2]["at_min"]            # reported before boarding
+    # the depot's extra special: a new id, the same route and stops as the overcrowded bus, and enough lead time to be boarded
+    bus = vehicles[over["vehicle_id"]]
+    assert deploy["vehicle_id"] not in vehicles and deploy["route_id"] == bus["route_id"] and deploy["role"] == "ALLOCATION"
+    assert [s["stop_id"] for s in deploy["stops"]] == [s["stop_id"] for s in bus["stops"]] and deploy["boarding"] == bus["boarding"]
+    assert deploy["depart_min"] >= steps[3]["at_min"] + 30                            # the bus check-in lead
+    assert deploy["pools"][0]["pool_id"].startswith(deploy["vehicle_id"] + ":") and deploy["name"] == bus["name"]
+    assert steps[4]["at_min"] < deploy["depart_min"] - 30                             # approved while it can still be boarded
+    assert vehicles[noshow["vehicle_id"]]["depart_min"] > steps[5]["at_min"]          # train has not left yet
     assert noshow["to_seg"] == len(vehicles[noshow["vehicle_id"]]["stops"]) - 1
     pool = next(p for p in vehicles[noshow["vehicle_id"]]["pools"] if p["pool_id"] == noshow["pool_id"])
-    assert 0 < noshow["seats_freed"] <= min(s["vacancy"] for s in pool["segments"]) + 4
+    assert 6 <= noshow["seats_freed"] <= 12 or not any(g["reserved"] for g in sc["groups"])     # a handful: half the waiting reserved demand, 6 to 12
+    assert noshow["seats_freed"] <= pool["nominal"]
     assert steps[0]["expect"]["affected_heads"] == 300
 
 
@@ -198,12 +206,12 @@ def test_every_allocatable_bus_serves_a_destination_and_buses_cover_avadi_and_po
 def test_second_chart_vacancies_fall_in_irs_final_chart_window_and_seats_stay_usable(sc):
     from safarset.domain import compat
     steps = sc["timeline"]["steps"]
-    chart = steps[4]
+    chart = steps[5]
     assert chart["label"] == "Second-chart vacancies reported on a train" and "second chart" in chart["payload"]["reported_by"]
     train = next(v for v in sc["vehicles"] if v["vehicle_id"] == chart["payload"]["vehicle_id"])
     lead = train["depart_min"] - chart["at_min"]
     assert 5 <= lead <= 30, f"second-chart vacancies reported {lead} min before departure; IR's final chart is prepared 30-5 min before"
-    ctx = {"now_min": steps[5]["at_min"], "min_checkin_min": {"TRAIN": 10, "BUS": 30}, "walk_m_per_min": 80}
+    ctx = {"now_min": steps[6]["at_min"], "min_checkin_min": {"TRAIN": 10, "BUS": 30}, "walk_m_per_min": 80}
     g = {"size": 1, "reserved": True, "class": "2S", "board_place": "CENTRAL", "dest_place": "ARAKKONAM", "requirements": {}, "attrs": {}}
     veh = dict(train, status="SCHEDULED", delay_min=0)
     assert train["depart_min"] >= steps[6]["at_min"] + 10                     # even the final approval leaves time to board

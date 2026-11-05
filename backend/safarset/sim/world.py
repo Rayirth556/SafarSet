@@ -18,9 +18,11 @@ PLACES = {
 }
 
 # Destination mix of the stranded passengers (weights, not percentages). SIMULATED.
+# The cancelled train runs Chennai Central -> Jolarpettai, so many of its passengers are long-distance (Jolarpettai, Tiruvallur), with a suburban share for Avadi and Poonamallee. Tiruvallur and Jolarpettai are reached by train only (no direct bus), which is where
+# the shortage (and the second-chart vacancies of the demo) show up.
 DEST_WEIGHTS = {
-    "ARAKKONAM": 0.16, "AVADI": 0.26, "KATPADI": 0.08, "VELLORE": 0.08,
-    "TIRUVALLUR": 0.14, "POONAMALLEE": 0.16, "JOLARPETTAI": 0.12,
+    "ARAKKONAM": 0.10, "AVADI": 0.20, "KATPADI": 0.08, "VELLORE": 0.08,
+    "TIRUVALLUR": 0.20, "POONAMALLEE": 0.18, "JOLARPETTAI": 0.16,
 }
 
 # Real MTC GTFS stop ids that serve each place (from data/real/reference/bus_stops.csv).

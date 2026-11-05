@@ -73,16 +73,25 @@ Checks: `cd frontend && npm test && npx tsc -b && npm run build`. Design referen
 
 `GET /sim/timeline` lists it; `POST /sim/timeline/next` plays one step at a time (or `run_demo.py` plays all of them):
 
-1. **Train cancelled at origin** (14:00). A plan is proposed automatically.
-2. **Plan proposed for approval.** Unresolved demand is shown with ranked alternatives.
-3. **Operator approves the plan.** Confirmed groups get an SMS (English or Tamil) with the journey and a short reason.
-4. **Conductor reports a bus overcrowded.** Confirmed groups with no physical room are displaced; a re-plan is proposed. The operator is warned that they still hold the old SMS.
-5. **Second-chart vacancies reported on a train.** The railway's final chart (prepared about 30 min before departure) shows berths now vacant.
-6. **Re-plan proposed for approval.** Confirmed passengers stay frozen; the diff shows DISPLACED / NEWLY PLACED / RESHUFFLED with counts.
-7. **Operator approves the re-plan.** Only changed groups are messaged.
+1. **Train cancelled; plan proposed for approval** (14:00). The platform proposes a plan by itself; unresolved demand is shown with ranked alternatives.
+2. **Operator approves the plan.** Confirmed groups get an SMS (English or Tamil) with the journey and a short reason.
+3. **Conductor reports a bus overcrowded.** Every confirmed group on it is displaced; a re-plan is proposed and the operator is warned that they still hold the old SMS.
+   Only a few get a seat elsewhere, the rest are unresolved.
+4. **Depot deploys an extra special** on the same route (`VEHICLE_DEPLOYED`, simulated). The re-plan puts the displaced groups on it.
+5. **Operator approves the re-plan.** The moved groups get a CHANGED update ("moved to ..."); nobody else is messaged.
+6. **Second-chart vacancies reported on a train.** The railway's final chart (prepared about 30 min before departure) shows reserved berths now vacant, on a train that
+   reaches destinations no direct bus serves. The re-plan places reserved-ticket passengers who were waiting. (An unreserved ticket cannot use a reserved berth, so
+   vacancies only help reserved-ticket holders.)
+7. **Operator approves the second re-plan.** Only the newly placed groups are messaged.
+
+Every step changes something the operator can see. The approval at step 5 comes before the second chart because the extra bus leaves soon: a plan that is not approved
+while a bus can still be boarded is dropped by the planner.
+
+The passenger mix of the scenario (`DEST_WEIGHTS` in `backend/safarset/sim/world.py`) is simulated input, shaped so that the shortage and the vacancies show up where trains
+are the only option (Tiruvallur, Jolarpettai). The numbers on screen are what the real allocator produces from it, not scripted.
 
 Extra demo controls under `/sim/*` (not part of the product): load scenario (seed), cancel / delay a train, close a road, inject an overcrowding
-report or second-chart vacancies, compliance and walk-on sliders, `POST /sim/depart/{vehicle}` (plan, observe, re-plan using the sliders: passengers
+report, deploy the extra bus (`POST /sim/deploy-bus`) or second-chart vacancies, compliance and walk-on sliders, `POST /sim/depart/{vehicle}` (plan, observe, re-plan using the sliders: passengers
 who ignore their allocation rush the earliest vehicle toward their destination), clock control.
 
 ## Real vs simulated

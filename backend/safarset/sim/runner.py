@@ -1,6 +1,6 @@
 """Play the scripted demo timeline against the event loop, in process (Phase 8 plays the same script over the API)."""
 
-_ACTOR = {"TRAIN_CANCELLED": "sim", "LOAD_REPORT": "field", "NOSHOWS_REPORTED": "field"}
+_ACTOR = {"TRAIN_CANCELLED": "sim", "LOAD_REPORT": "field", "NOSHOWS_REPORTED": "field", "VEHICLE_DEPLOYED": "sim"}
 
 
 def play_step(engine, step):

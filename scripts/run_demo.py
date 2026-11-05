@@ -104,7 +104,7 @@ class Demo:
         self.out(f"loaded {meta['label']} scenario: seed {self.seed}, {meta['heads']} passengers, {meta['vehicles']} vehicles, clock {meta['clock']}")
         timeline = self.get("/sim/timeline")
         steps = timeline["steps"]
-        state = {"sms_before": 0, "confirmed_after_first_approval": set(), "confirmed_before": set(), "notified": set(), "pool_before": None}
+        state = {}
         for step in steps:
             rep = StepReport(step["step"], step["label"], step["at"])
             before = self.snapshot()
@@ -120,24 +120,32 @@ class Demo:
         return {"sms": self.sms_events(), "confirmed": set(self.confirmed()), "capacity": self.capacity(), "kpis": self.get("/api/kpis"),
                 "pending": self.get("/api/batches/pending")}
 
+    def new_sms(self, before):
+        last = max([x["seq"] for x in before["sms"]], default=0)
+        return [e for e in self.sms_events() if e["seq"] > last]
+
+    def kinds_by_group(self, events):
+        return {e["payload"]["group_id"]: (e["payload"].get("detail") or {}).get("kind") for e in events}
+
+    @staticmethod
+    def with_reason(events):
+        return all(e["payload"].get("reason") and e["payload"]["reason"] in e["payload"]["message"] for e in events)
+
     # ------------------------------------------------------------------ per-step expectations (from the timeline's own `expect`)
     def after_step(self, step, result, before, rep, state):
         exp, add = step["expect"], rep.checks.append
-        t, k, pend = step["type"], self.get("/api/kpis"), self.get("/api/batches/pending")
+        n, k, pend = step["step"], self.get("/api/kpis"), self.get("/api/batches/pending")
         sms_now = self.sms_events()
-        if step["step"] == 1:
+        if n == 1:
             add(Check(k["affected"]["heads"] == exp["affected_heads"], f"{k['affected']['heads']} stranded passengers affected (expected {exp['affected_heads']})"))
             add(Check(self.get("/api/state")["banner"]["active"], "disruption banner is up: " + self.get("/api/state")["banner"]["title"]))
-            add(Check(pend is not None and pend["status"] == "PROPOSED" and pend["cause"] == "TRAIN_CANCELLED", "a plan was proposed automatically (pending, needs approval)"))
-            add(Check(len(sms_now) == 0, "nothing has been sent to passengers yet (approval only)"))
-        elif step["step"] == 2:
-            add(Check(pend is not None and pend["status"] == "PROPOSED" and not pend["stale"], "the pending plan is fresh (not stale)"))
+            add(Check(pend is not None and pend["status"] == exp["batch_status"] and pend["cause"] == "TRAIN_CANCELLED", "a plan was proposed automatically (pending, needs approval)"))
+            add(Check(not pend["stale"], "the pending plan is fresh (not stale)"))
             add(Check(k["unresolved"]["heads"] >= exp["unresolved_heads_min"], f"some demand is unresolved and shown with alternatives (>= {exp['unresolved_heads_min']} head)"))
             alt = self.get("/api/unresolved")
             add(Check(alt and all(i["alternatives"][-1]["type"] == "WAITLIST" for g in alt for i in g["items"]), "every unresolved group has ranked alternatives ending in a waitlist position"))
-            add(Check(len(sms_now) == 0, "still nothing sent"))
-            state["confirmed_before"] = set(self.confirmed())
-        elif step["step"] == 3:
+            add(Check(len(sms_now) == 0, "nothing has been sent to passengers yet (approval only)"))
+        elif n == 2:
             conf = self.confirmed()
             add(Check(k["confirmed"]["heads"] >= exp["confirmed_heads_min"], f"plan approved: {k['confirmed']['groups']} groups confirmed"))
             add(Check(k["tentative"]["heads"] == exp["tentative_heads"] == 0, "nothing is left tentative"))
@@ -147,47 +155,80 @@ class Demo:
             add(Check(not missing, "every confirmed passenger's phone mock shows the message"))
             wrong = [g for g, p in list(conf.items())[:60] if not self.message_matches(p)]
             add(Check(not wrong, "messages name the journey times and a reason (spot-checked on 60 groups)"))
-            state["confirmed_after_first_approval"] = set(conf)
-            state["notified"] = notified
-        elif step["step"] == 4:
+            add(Check(all(m == "NEW" for m in self.kinds_by_group(sms_now).values()), "every first message is a NEW journey"))
+        elif n == 3:
             pool = self.capacity()[step["payload"]["pool_id"]]
             add(Check(pool["field_report"] and pool["field_report"]["level"] == "OVERCROWDED", f"{step['payload']['vehicle_id']} is flagged OVERCROWDED in the capacity view"))
             add(Check(any(e["type"] == "LOAD_REPORT" and e["payload"]["vehicle_id"] == step["payload"]["vehicle_id"] for e in self.events()), "the field report is in the event log"))
             now_conf = set(self.confirmed())
             displaced = before["confirmed"] - now_conf
-            add(Check(now_conf <= before["confirmed"], f"only confirmed groups on that bus lost a seat ({len(displaced)} displaced); nobody new was confirmed"))
-            items = {i["group_id"] for i in (pend or {}).get("items", {}).get("DISPLACED", [])}
-            add(Check(displaced <= items, "every displaced group appears as DISPLACED in the new pending plan"))
-            add(Check(all(i["detail"].get("old_sms_still_held") for i in (pend or {}).get("items", {}).get("DISPLACED", [])), "the operator is warned that displaced passengers still hold the old SMS"))
+            add(Check(now_conf <= before["confirmed"] and len(displaced) >= exp["displaced_groups_min"],
+                      f"only confirmed groups on that bus lost a seat ({len(displaced)} displaced); nobody new was confirmed"))
+            items = (pend or {}).get("items", {}).get("DISPLACED", [])
+            add(Check(displaced <= {i["group_id"] for i in items}, "every displaced group appears as DISPLACED in the new pending plan"))
+            add(Check(all(i["detail"].get("old_sms_still_held") for i in items), "the operator is warned that displaced passengers still hold the old SMS"))
             add(Check(len(sms_now) == len(before["sms"]), "no SMS was sent for the displacement (it needs approval)"))
+            state["displaced_replaced_alone"] = sum(1 for i in items if i["detail"].get("replaced"))
             state["confirmed_before"] = now_conf
-            state["pool_before"] = before["capacity"]
-        elif step["step"] == 5:
-            p = step["payload"]
-            b, a = before["capacity"][p["pool_id"]], self.capacity()[p["pool_id"]]
-            grew = [a["segments"][i]["cap"] - b["segments"][i]["cap"] for i in range(p["from_seg"], p["to_seg"])]
-            ok = all(g == min(exp["vacancy_increase_seats"], a["nominal"] - b["segments"][i]["cap"]) for g, i in zip(grew, range(p["from_seg"], p["to_seg"])))
-            add(Check(ok and max(grew) > 0, f"second-chart vacancies: {p['vehicle_id']} gains up to {p['seats_freed']} seats per segment"))
-            add(Check(any(e["type"] == "NOSHOWS_REPORTED" for e in self.events()), "the vacancy report is in the event log (type NOSHOWS_REPORTED)"))
-            add(Check(len(sms_now) == len(before["sms"]), "still nothing sent"))
-        elif step["step"] == 6:
-            add(Check(pend is not None and not pend["stale"], "a fresh re-plan is pending"))
+        elif n == 4:
+            new_id = exp["deployed_vehicle"]
+            cap = {v["vehicle_id"]: v for v in self.get("/api/capacity")}
+            extra = cap.get(new_id)
+            scripted = self.get("/sim/timeline")["steps"][2]["payload"]["vehicle_id"]
+            add(Check(extra is not None and extra["status"] == "SCHEDULED" and extra["role"] == "ALLOCATION", f"the extra special {new_id} is now allocatable in the capacity view"))
+            add(Check(extra is not None and extra["route_id"] == cap[scripted]["route_id"] and extra["stops"] == cap[scripted]["stops"],
+                      f"it runs the same route and stops as the overcrowded {scripted}"))
+            add(Check(any(e["type"] == "VEHICLE_DEPLOYED" for e in self.events()), "the deployment is in the event log (type VEHICLE_DEPLOYED)"))
             add(Check(set(self.confirmed()) == state["confirmed_before"], "confirmed passengers are frozen (only displaced ones may move)"))
-            counts = pend["diff"]
-            add(Check(any(counts[c]["groups"] for c in ("DISPLACED", "NEWLY_PLACED", "RESHUFFLED")),
-                      "re-plan diff: " + ", ".join(f"{c} {counts[c]['groups']}" for c in ("DISPLACED", "NEWLY_PLACED", "RESHUFFLED", "PLACED", "UNRESOLVED"))))
-            state["pending_groups"] = {i["group_id"] for cat in ("NEWLY_PLACED", "RESHUFFLED", "DISPLACED") for i in pend["items"].get(cat, [])
-                                       if i["detail"].get("vehicle_id")}
-            state["displaced_unplaced"] = {i["group_id"] for i in pend["items"].get("DISPLACED", []) if i["detail"].get("replaced") is False}
-        elif step["step"] == 7:
-            add(Check(k["tentative"]["heads"] == exp["tentative_heads"] == 0 and pend is None, "re-plan approved: nothing left pending"))
-            new = [e for e in sms_now if e["seq"] > max([x["seq"] for x in before["sms"]], default=0)]
+            items = (pend or {}).get("items", {}).get("DISPLACED", [])
+            on_new = [i for i in items if i["detail"].get("vehicle_id") == new_id]
+            share = len(on_new) / max(1, len(items))
+            add(Check(share >= exp["displaced_replaced_share_min"] and len(on_new) >= state["displaced_replaced_alone"],
+                      f"the re-plan puts {len(on_new)} of {len(items)} displaced groups on the extra bus ({share:.0%}); before it, {state['displaced_replaced_alone']} had a seat"))
+            add(Check(pend is not None and not pend["stale"], "a fresh re-plan is pending"))
+            add(Check(len(sms_now) == len(before["sms"]), "still nothing sent (the re-plan needs approval)"))
+            state["moved_groups"] = {i["group_id"] for i in items if i["detail"].get("replaced")}
+            state["displaced_unplaced"] = {i["group_id"] for i in items if not i["detail"].get("replaced")}
+        elif n == 5:
+            new = self.new_sms(before)
             new_groups = {e["payload"]["group_id"] for e in new}
-            add(Check(state["pending_groups"] <= new_groups, f"every group whose journey changed was told ({len(state['pending_groups'])} placed groups)"))
+            kinds = self.kinds_by_group(new)
+            add(Check(k["tentative"]["heads"] == exp["tentative_heads"] == 0 and pend is None, "re-plan approved: nothing left pending"))
+            add(Check(state["moved_groups"] <= new_groups, f"every displaced group that got a new seat was told ({len(state['moved_groups'])} groups)"))
             add(Check(state["displaced_unplaced"] <= new_groups, f"displaced passengers with no new seat were told so ({len(state['displaced_unplaced'])} groups)"))
             add(Check(not (new_groups & state["confirmed_before"]), "groups whose seat did not change were not messaged again"))
-            add(Check(all("Changed:" in e["payload"]["message"] or "மாற்றம்:" in e["payload"]["message"] or "Priority" in e["payload"]["message"] or "முன்னுரிமை" in e["payload"]["message"]
-                          or "Why:" in e["payload"]["message"] or "காரணம்:" in e["payload"]["message"] for e in new), "change messages carry a short reason"))
+            add(Check(all(kinds.get(g) == "CHANGED" for g in state["moved_groups"]), 'the moved groups got a CHANGED update ("moved to ...")'))
+            add(Check(all(kinds.get(g) == "DISPLACED_UNPLACED" for g in state["displaced_unplaced"]), "the groups still without a seat got a seat-lost message"))
+            add(Check(self.with_reason(new), "every message carries its short reason"))
+            state["confirmed_before"] = set(self.confirmed())
+        elif n == 6:
+            p = step["payload"]
+            b, a = before["capacity"][p["pool_id"]], self.capacity()[p["pool_id"]]
+            idx = range(p["from_seg"], p["to_seg"])
+            grew = [a["segments"][i]["cap"] - b["segments"][i]["cap"] for i in idx]
+            ok = all(g == min(exp["vacancy_increase_seats"], a["nominal"] - b["segments"][i]["cap"]) for g, i in zip(grew, idx))
+            add(Check(ok and max(grew) > 0, f"second-chart vacancies: {p['vehicle_id']} gains up to {p['seats_freed']} seats per segment"))
+            add(Check(any(e["type"] == "NOSHOWS_REPORTED" for e in self.events()), "the vacancy report is in the event log (type NOSHOWS_REPORTED)"))
+            add(Check(pend is not None and not pend["stale"], "a fresh re-plan is pending"))
+            add(Check(set(self.confirmed()) == state["confirmed_before"], "confirmed passengers are frozen"))
+            counts = pend["diff"]
+            placed = counts["NEWLY_PLACED"]
+            add(Check(placed["groups"] >= exp["newly_placed_groups_min"],
+                      f"the vacancies place people who were still waiting: {placed['groups']} groups / {placed['heads']} heads newly placed"))
+            add(Check(True, "re-plan diff: " + ", ".join(f"{c} {counts[c]['groups']}" for c in ("DISPLACED", "NEWLY_PLACED", "RESHUFFLED", "PLACED", "UNRESOLVED"))))
+            add(Check(len(sms_now) == len(before["sms"]), "still nothing sent"))
+            state["newly_placed"] = {i["group_id"] for i in pend["items"].get("NEWLY_PLACED", [])}
+            state["pending_groups"] = {i["group_id"] for cat in ("NEWLY_PLACED", "RESHUFFLED", "DISPLACED") for i in pend["items"].get(cat, []) if i["detail"].get("vehicle_id")}
+        elif n == 7:
+            new = self.new_sms(before)
+            new_groups = {e["payload"]["group_id"] for e in new}
+            kinds = self.kinds_by_group(new)
+            add(Check(k["tentative"]["heads"] == exp["tentative_heads"] == 0 and pend is None, "second re-plan approved: nothing left pending"))
+            add(Check(state["pending_groups"] <= new_groups, f"every group whose journey changed was told ({len(state['pending_groups'])} placed groups)"))
+            add(Check(new_groups <= state["pending_groups"], "nobody else was messaged"))
+            add(Check(not (new_groups & state["confirmed_before"]), "groups whose seat did not change were not messaged again"))
+            add(Check(all(kinds.get(g) == "NEW" for g in state["newly_placed"]), "the newly placed groups got a NEW journey message"))
+            add(Check(self.with_reason(new), "every message carries its short reason"))
 
     def message_matches(self, passenger):
         a = passenger["allocation"]
@@ -200,14 +241,14 @@ class Demo:
     def final(self, state):
         rep = StepReport(0, "Whole run", "")
         k = self.get("/api/kpis")
-        evs = self.events()
         types = {}
-        for e in evs:
+        for e in self.events():
             types[e["type"]] = types.get(e["type"], 0) + 1
-        rep.checks.append(Check(types.get("BATCH_APPROVED") == 2 and types.get("TRAIN_CANCELLED") == 1, "the log shows 1 cancellation and 2 approvals"))
+        rep.checks.append(Check(types.get("BATCH_APPROVED") == 3 and types.get("TRAIN_CANCELLED") == 1 and types.get("VEHICLE_DEPLOYED") == 1,
+                                "the log shows 1 cancellation, 1 extra bus and 3 approvals"))
         rep.checks.append(Check(k["tentative"]["heads"] == 0, "no tentative plan left over at the end"))
         batches = self.get("/api/batches")
-        rep.checks.append(Check([b["status"] for b in batches].count("APPROVED") == 2 and all(b["status"] in ("APPROVED", "SUPERSEDED") for b in batches),
+        rep.checks.append(Check([b["status"] for b in batches].count("APPROVED") == 3 and all(b["status"] in ("APPROVED", "SUPERSEDED") for b in batches),
                                 "every plan was approved or superseded"))
         self.reports.append(rep)
         self.print_step(rep)

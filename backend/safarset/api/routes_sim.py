@@ -72,8 +72,9 @@ async def close_road(request: Request, body: models.CloseRoadBody):
     return _serialise(res)
 
 
-def _timeline_step(st, n):
-    return st.scenario["timeline"]["steps"][n]
+def _timeline_step(st, type_):
+    """The scripted step of this event type (the demo controls default to what the script does)."""
+    return next(s for s in st.scenario["timeline"]["steps"] if s["type"] == type_)
 
 
 @router.post("/inject-overcrowd")
@@ -81,7 +82,7 @@ async def inject_overcrowd(request: Request, body: models.InjectOvercrowdBody | 
     """A conductor's ETM reports a bus overcrowded before boarding (defaults to the scripted step-4 vehicle and count)."""
     st = _st(request)
     body = body or models.InjectOvercrowdBody()
-    scripted = _timeline_step(st, 3)["payload"]
+    scripted = _timeline_step(st, "LOAD_REPORT")["payload"]
     vid = body.vehicle_id or scripted["vehicle_id"]
     pool = scripted["pool_id"] if vid == scripted["vehicle_id"] else None
     if pool is None:
@@ -94,6 +95,14 @@ async def inject_overcrowd(request: Request, body: models.InjectOvercrowdBody | 
     return _serialise(await st.mutate(lambda: st.engine.handle("LOAD_REPORT", "field", payload, st.clock)))
 
 
+@router.post("/deploy-bus")
+async def deploy_bus(request: Request):
+    """The depot sends an extra special on the overcrowded bus's route: the scripted step-4 vehicle, with its scripted timing."""
+    st = _st(request)
+    step = _timeline_step(st, "VEHICLE_DEPLOYED")
+    return _serialise(await st.mutate(lambda: st.engine.handle("VEHICLE_DEPLOYED", "sim", step["payload"], st.clock)))
+
+
 @router.post("/inject-vacancies")
 @router.post("/inject-noshows", deprecated=True)
 async def inject_vacancies(request: Request, body: models.InjectVacanciesBody | None = None):
@@ -102,7 +111,7 @@ async def inject_vacancies(request: Request, body: models.InjectVacanciesBody | 
     (`/inject-noshows` is the old name of this endpoint. The event type stays NOSHOWS_REPORTED.)"""
     st = _st(request)
     body = body or models.InjectVacanciesBody()
-    scripted = _timeline_step(st, 4)["payload"]
+    scripted = _timeline_step(st, "NOSHOWS_REPORTED")["payload"]
     vid = body.vehicle_id or scripted["vehicle_id"]
     pool = body.pool_id or (scripted["pool_id"] if vid == scripted["vehicle_id"] else None)
     if pool is None:

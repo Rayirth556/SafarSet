@@ -94,11 +94,16 @@ function Disruptions({ act, state, vehicles, names }: { act: Act; state: LoadedS
 function FieldReports({ act, timeline, names }: { act: Act; timeline: Timeline | undefined; names: ReturnType<typeof useVehicleIndex> }) {
   const over = timeline?.steps.find((s) => s.type === 'LOAD_REPORT')?.payload as { vehicle_id?: string } | undefined
   const chart = timeline?.steps.find((s) => s.type === 'NOSHOWS_REPORTED')?.payload as { vehicle_id?: string; seats_freed?: number } | undefined
+  const extra = timeline?.steps.find((s) => s.type === 'VEHICLE_DEPLOYED')?.payload as { vehicle?: { vehicle_id: string; name?: string; depart_min: number } } | undefined
   return (
     <Section title="Field reports (simulated)">
       <button className={btn} disabled={act.busy || !over}
         onClick={() => void act.run(`${nameOf(names, over?.vehicle_id)} conductor: overcrowded`, () => api.injectOvercrowd({}), (r) => (r.batch_id ? `re-plan ${r.batch_id} proposed` : 'reported'))}>
         {over ? nameOf(names, over.vehicle_id) : 'Bus'} conductor: overcrowded
+      </button>
+      <button className={btn} disabled={act.busy || !extra}
+        onClick={() => void act.run(`Depot deploys an extra ${extra?.vehicle?.name ?? 'special'} bus`, api.deployBus, (r) => (r.batch_id ? `re-plan ${r.batch_id} proposed` : 'deployed'))}>
+        Depot deploys an extra {extra?.vehicle?.name ?? 'special'} bus{extra?.vehicle ? ` (leaves ${String(Math.floor(extra.vehicle.depart_min / 60)).padStart(2, '0')}:${String(extra.vehicle.depart_min % 60).padStart(2, '0')})` : ''}
       </button>
       <button className={btn} disabled={act.busy || !chart}
         onClick={() => void act.run(`TTE: second-chart vacancies on ${nameOf(names, chart?.vehicle_id)}`, () => api.injectVacancies({}), (r) => (r.batch_id ? `re-plan ${r.batch_id} proposed` : 'reported'))}>

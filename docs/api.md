@@ -56,11 +56,11 @@ The phone mock shows only `PHONE_MOCK` messages; real SMS (optional, behind a fl
 
 ## 4. Demo controls (`/sim`, not part of the product)
 `POST /load-scenario` `{seed, n_passengers, pct_senior, pct_groups, compliance_rate, walkon_rate, ...}`,
-`POST /cancel-train`, `POST /delay-train`, `POST /close-road`, `POST /inject-overcrowd`, `POST /inject-vacancies` (second-chart vacancies; `/inject-noshows` is the deprecated old name),
+`POST /cancel-train`, `POST /delay-train`, `POST /close-road`, `POST /inject-overcrowd`, `POST /deploy-bus` (the depot sends an extra special on the overcrowded bus's route: event `VEHICLE_DEPLOYED`, which carries the whole vehicle spec; a re-plan follows; a vehicle id can be deployed once), `POST /inject-vacancies` (second-chart vacancies; `/inject-noshows` is the deprecated old name),
 `GET|PUT /params` (compliance and walk-on sliders), `POST /clock` (logged as a `CLOCK_SET` event), `POST /depart/{vehicle_id}` (plan -> observe -> re-plan using the sliders: confirmed groups that ignore their allocation
 rush the earliest-departing vehicle toward their destination and add to its load; allocated groups board in priority order while there is room; the load
 report counts everyone present and OVERCROWDED displaces whoever is refused; rushers become BOARDED with `boarded_on_own` set),
-`GET /timeline`, `POST /timeline/next`, `POST /timeline/reset` (play the scripted demo one step at a time; each step has a display `label`, for example "Second-chart vacancies reported on a train").
+`GET /timeline`, `POST /timeline/next`, `POST /timeline/reset` (play the scripted demo one step at a time; each step has a display `label`, for example "Second-chart vacancies reported on a train"; steps are found by `type`, not by position).
 An end-to-end script that plays all of it and checks the state at every step: `python scripts/run_demo.py`.
 
 ## 5. Live stream `WS /ws`

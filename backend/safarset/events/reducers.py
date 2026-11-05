@@ -7,7 +7,7 @@ import json
 import math
 import sqlite3
 
-from ..db.loader import load_scenario
+from ..db.loader import load_scenario, load_vehicle
 
 HOLDING = ("TENTATIVE", "CONFIRMED", "BOARDED")
 
@@ -377,6 +377,21 @@ def batch_approved(conn, seq, p):
     conn.execute("UPDATE plan_batches SET status = 'APPROVED', approved_seq = ? WHERE batch_id = ?", (seq, p.batch_id))
 
 
+def vehicle_deployed(conn, seq, p):
+    """An extra vehicle becomes allocatable. Only dispatched (ALLOCATION) vehicles can be deployed, and only new ids."""
+    v = p.vehicle
+    missing = [k for k in ("vehicle_id", "mode", "role", "label", "depart_min", "boarding", "attrs", "stops", "pools") if k not in v]
+    if missing:
+        raise Rejected(f"vehicle spec is missing {', '.join(missing)}")
+    if v["role"] != "ALLOCATION":
+        raise Rejected("only an allocatable (dispatched) vehicle can be deployed")
+    if _one(conn, "SELECT 1 FROM vehicles WHERE vehicle_id = ?", (v["vehicle_id"],)):
+        raise Rejected(f"vehicle {v['vehicle_id']} already exists")
+    if not v["stops"] or not v["pools"]:
+        raise Rejected("a deployed vehicle needs stops and at least one pool")
+    load_vehicle(conn, v)
+
+
 def sms_sent(conn, seq, p):
     if _one(conn, "SELECT 1 FROM groups WHERE group_id = ?", (p.group_id,)) is None:
         raise Rejected(f"unknown group {p.group_id}")
@@ -476,7 +491,7 @@ REDUCERS = {
     "SCENARIO_LOADED": scenario_loaded, "TRAIN_CANCELLED": train_cancelled, "TRAIN_DELAYED": train_delayed,
     "ROAD_CLOSED": road_closed, "VACANCY_UPDATE": vacancy_update, "NOSHOWS_REPORTED": noshows_reported,
     "LOAD_REPORT": load_report, "PASSENGER_BOARDED": passenger_boarded, "PASSENGER_DISPLACED": passenger_displaced,
-    "PLAN_PROPOSED": plan_proposed, "BATCH_APPROVED": batch_approved, "SMS_SENT": sms_sent,
+    "PLAN_PROPOSED": plan_proposed, "BATCH_APPROVED": batch_approved, "SMS_SENT": sms_sent, "VEHICLE_DEPLOYED": vehicle_deployed,
     "OPERATOR_OVERRIDE": operator_override, "WEIGHTS_CHANGED": weights_changed, "BUFFER_CHANGED": buffer_changed,
     "SIM_PARAMS_CHANGED": sim_params_changed, "COMMAND_REJECTED": _noop, "CLOCK_SET": clock_set,
     "GROUP_SELF_BOARDED": group_self_boarded,

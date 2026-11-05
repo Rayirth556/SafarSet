@@ -17,6 +17,10 @@ export function eventSummary(e: SafarEvent): string {
     case 'TRAIN_DELAYED': return `${s(p.vehicle_id)} delayed ${s(p.delay_min)} min`
     case 'ROAD_CLOSED': return `Road closed: ${s(p.description)}`
     case 'LOAD_REPORT': return `${s(p.vehicle_id)} reported ${s(p.level).toLowerCase()}${p.count != null ? ` (${s(p.count)} aboard)` : ''}`
+    case 'VEHICLE_DEPLOYED': {
+      const v = (p.vehicle ?? {}) as { vehicle_id?: string; name?: string; depart_min?: number }
+      return `Extra ${s(v.name ?? v.vehicle_id)} (${s(v.vehicle_id)}) deployed, departs ${hhmm(v.depart_min)}`
+    }
     case 'VACANCY_UPDATE': return `Chart vacancy set to ${s(p.vacancy)} on ${s(p.pool_id)}`
     case 'NOSHOWS_REPORTED': return `Second-chart vacancies: ${s(p.seats_freed)} seats on ${s(p.vehicle_id)}`
     case 'PASSENGER_BOARDED': return `Group boarded (allocation ${s(p.allocation_id)})`

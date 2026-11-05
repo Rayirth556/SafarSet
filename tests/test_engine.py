@@ -104,7 +104,7 @@ def test_scripted_demo_timeline_plays_against_the_event_loop(world, scenario):
     def check(step, res):
         n = step["step"]
         assert check_invariants(c) == [], f"step {n}"
-        if n == 1:                                                   # cancellation: a plan is proposed, nothing is sent
+        if n == 1:                                                   # cancellation: a plan is proposed by itself, nothing is sent
             pend = e.pending_batch()
             assert pend["status"] == "PROPOSED" and res.batch_id == pend["batch_id"]
             affected = {r["group_id"] for r in rows(c, "SELECT group_id FROM groups WHERE affected = 1")}
@@ -112,53 +112,73 @@ def test_scripted_demo_timeline_plays_against_the_event_loop(world, scenario):
             assert set(tentative(c)) | set(items(c, pend["batch_id"], "UNRESOLVED")) == affected
             assert notifier.calls == [] and scalar(c, "SELECT COUNT(*) FROM notifications") == 0
             snapshot("after_plan")
-        elif n == 2:
-            assert res == e.pending_batch()["batch_id"]          # the plan from step 1 is still the fresh pending batch
-        elif n == 3:                                                 # approval: confirmed + SMS to exactly those groups
+        elif n == 2:                                                 # approval: confirmed + SMS to exactly those groups
             assert set(res.confirmed_groups) == set(log["after_plan"]["tentative"])
             assert {g for g, _, _ in notifier.calls} == set(res.confirmed_groups)
             assert confirmed(c) == set(res.confirmed_groups) and tentative(c) == {}
             assert scalar(c, "SELECT COUNT(*) FROM notifications") == len(res.confirmed_groups)
             snapshot("after_approval")
-        elif n == 4:                                                 # conductor reports the first bus overcrowded
-            vid = step["payload"]["vehicle_id"]
+        elif n == 3:                                                 # conductor reports the first bus overcrowded
             assert rows(c, "SELECT level FROM field_reports WHERE pool_id = ?", step["payload"]["pool_id"])[0]["level"] == "OVERCROWDED"
             displaced = {r["group_id"] for r in rows(c, "SELECT group_id FROM allocations WHERE status='DISPLACED'")}
-            assert displaced <= log["after_approval"]["confirmed"]
+            assert displaced and displaced <= log["after_approval"]["confirmed"]
             for r in rows(c, "SELECT status_reason FROM allocations WHERE status='DISPLACED'"):
                 assert json.loads(r["status_reason"])["cause"] == "LOAD_REPORT"
             assert scalar(c, "SELECT COUNT(*) FROM notifications") == log["after_approval"]["sms_rows"]     # still nothing sent
             assert res.batch_id and set(items(c, res.batch_id, "DISPLACED")) == displaced
             assert confirmed(c) == log["after_approval"]["confirmed"] - displaced                           # confirmed are frozen
+            log["displaced"] = displaced
+            log["replaced_alone"] = sum(1 for r in rows(c, "SELECT detail FROM batch_items WHERE batch_id = ? AND kind = 'DISPLACED'", res.batch_id)
+                                        if json.loads(r["detail"]).get("replaced"))
             snapshot("after_overcrowd")
-        elif n == 5:                                                 # second-chart vacancies: seats appear
+        elif n == 4:                                                 # the depot deploys an extra special on the same route
+            new = step["payload"]["vehicle"]["vehicle_id"]
+            assert scalar(c, "SELECT status FROM vehicles WHERE vehicle_id = ?", new) == "SCHEDULED"
+            over = scenario["timeline"]["steps"][2]["payload"]["vehicle_id"]
+            assert new != over and scalar(c, "SELECT route_id FROM vehicles WHERE vehicle_id = ?", new) == scalar(c, "SELECT route_id FROM vehicles WHERE vehicle_id = ?", over)
+            assert scalar(c, "SELECT COUNT(*) FROM vehicle_stops WHERE vehicle_id = ?", new) == len(step["payload"]["vehicle"]["stops"])
+            assert scalar(c, "SELECT COUNT(*) FROM notifications") == log["after_approval"]["sms_rows"]     # still nothing sent
+            assert confirmed(c) == log["after_overcrowd"]["confirmed"]                                       # still frozen
+            on_new = [r for r in rows(c, "SELECT group_id, detail FROM batch_items WHERE batch_id = ? AND kind = 'DISPLACED'", res.batch_id)
+                      if json.loads(r["detail"]).get("vehicle_id") == new]
+            assert len(on_new) >= max(log["replaced_alone"], len(log["displaced"]) // 2)           # most displaced groups now have a seat
+            assert set(items(c, res.batch_id, "DISPLACED")) == log["displaced"]
+            log["unplaced_after_deploy"] = {r["group_id"] for r in rows(c, "SELECT group_id, detail FROM batch_items WHERE batch_id = ? AND kind = 'DISPLACED'", res.batch_id)
+                                            if not json.loads(r["detail"]).get("replaced")}
+            snapshot("after_deploy")
+        elif n == 5:                                                 # approval of the re-plan: the displaced are told where they moved
+            assert tentative(c) == {} and e.pending_batch() is None
+            told = {g for g, _, _ in notifier.calls[log["after_deploy"]["notified"]:]}
+            assert told >= set(res.confirmed_groups) and told >= log["displaced"] - set(log["unplaced_after_deploy"])
+            assert not (told & log["after_overcrowd"]["confirmed"])                                         # frozen groups were not re-notified
+            assert {kind for _, kind, _ in notifier.calls[log["after_deploy"]["notified"]:]} <= {"CHANGED", "DISPLACED_UNPLACED"}
+            snapshot("after_replan_approved")
+        elif n == 6:                                                 # second-chart vacancies: seats appear, a fresh re-plan places people
             p = step["payload"]
             caps = [r["cap"] for r in rows(c, "SELECT cap FROM segment_capacity WHERE pool_id = ? ORDER BY seg_idx", p["pool_id"])]
             nominal = scalar(c, "SELECT nominal FROM pools WHERE pool_id = ?", p["pool_id"])
             assert all(cap <= nominal for cap in caps)
-            assert scalar(c, "SELECT COUNT(*) FROM notifications") == log["after_approval"]["sms_rows"]
-            snapshot("after_vacancies")
-        elif n == 6:                                                 # re-plan pending, fresh, confirmed still frozen
+            assert scalar(c, "SELECT COUNT(*) FROM notifications") == log["after_replan_approved"]["sms_rows"]
             pend = e.pending_batch()
             assert pend and not batch_is_stale(c, pend["batch_id"])
-            assert confirmed(c) == log["after_overcrowd"]["confirmed"]
-            counts = diff_counts(c, pend["batch_id"])
-            assert counts["DISPLACED"] > 0 or counts["NEWLY_PLACED"] > 0 or counts["RESHUFFLED"] > 0
+            assert confirmed(c) == log["after_replan_approved"]["confirmed"]
+            assert diff_counts(c, pend["batch_id"])["NEWLY_PLACED"] > 0                                     # the vacancies visibly place people
+            snapshot("after_vacancies")
         elif n == 7:                                                 # second approval: only changed groups are notified
             before = log["after_vacancies"]
             assert set(res.confirmed_groups) == set(before["tentative"])
             assert confirmed(c) == before["confirmed"] | set(res.confirmed_groups)
             assert tentative(c) == {} and e.pending_batch() is None
-            new_calls = notifier.calls[log["after_approval"]["notified"]:]
+            new_calls = notifier.calls[log["after_replan_approved"]["notified"]:]
             assert {g for g, _, _ in new_calls} >= set(res.confirmed_groups)
-            assert not ({g for g, _, _ in new_calls} & log["after_overcrowd"]["confirmed"])   # frozen groups were not re-notified
+            assert not ({g for g, _, _ in new_calls} & log["after_replan_approved"]["confirmed"])    # frozen groups were not re-notified
 
     play_timeline(e, scenario, check)
     # every displaced group is either re-confirmed on a new seat or still unresolved; never double-booked
     assert scalar(c, "SELECT COUNT(*) FROM (SELECT group_id FROM allocations WHERE status IN ('TENTATIVE','CONFIRMED','BOARDED') "
                      "GROUP BY group_id HAVING COUNT(*) > 1)") == 0
     kinds = {r["kind"] for r in rows(c, "SELECT DISTINCT kind FROM batch_items")}
-    assert {"NEWLY_PLACED", "UNRESOLVED"} <= kinds
+    assert {"NEWLY_PLACED", "UNRESOLVED", "DISPLACED"} <= kinds
 
 
 # ================================================================================================ approval only

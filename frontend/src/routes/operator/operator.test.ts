@@ -113,3 +113,11 @@ describe('demo page scale', () => {
     }
   })
 })
+
+
+describe('extra vehicle in the event log', () => {
+  it('names the vehicle and when it leaves', () => {
+    const e = ev(1, 'VEHICLE_DEPLOYED', { vehicle: { vehicle_id: 'BUS-SPL-05', name: 'MTC 54', depart_min: 920 } })
+    expect(eventSummary(e)).toBe('Extra MTC 54 (BUS-SPL-05) deployed, departs 15:20')
+  })
+})

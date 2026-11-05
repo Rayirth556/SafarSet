@@ -21,7 +21,7 @@ const CAUSES: Record<string, string> = {
   TRAIN_CANCELLED: 'Train cancelled', TRAIN_DELAYED: 'Train delayed', ROAD_CLOSED: 'Road closed', LOAD_REPORT: 'Load report from the field',
   VACANCY_UPDATE: 'Chart vacancy update', NOSHOWS_REPORTED: 'Second-chart vacancies', PASSENGER_DISPLACED: 'Passenger displaced',
   WEIGHTS_RERUN: 'Weights re-run', MANUAL_REPLAN: 'Manual re-plan', OPERATOR_OVERRIDE: 'Operator override', BUFFER_CHANGED: 'Buffer changed',
-  GROUP_SELF_BOARDED: 'Passengers boarded on their own',
+  GROUP_SELF_BOARDED: 'Passengers boarded on their own', VEHICLE_DEPLOYED: 'Extra vehicle deployed',
 }
 export const causeLabel = (c: string) => CAUSES[c] ?? prettify(c.toLowerCase())
 

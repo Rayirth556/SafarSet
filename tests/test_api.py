@@ -368,9 +368,11 @@ def test_rushed_vehicles_displace_the_groups_refused_at_the_door_and_replan_them
 def test_scripted_timeline_can_be_played_step_by_step_and_reset(loaded):
     t = get(loaded, "/sim/timeline")
     assert t["total"] == 7 and t["next_step"] == 0 and [s["type"] for s in t["steps"]][0] == "TRAIN_CANCELLED"
-    assert [s["label"] for s in t["steps"]] == ["Train cancelled at origin", "Plan proposed for approval", "Operator approves the plan",
-                                                "Conductor reports a bus overcrowded", "Second-chart vacancies reported on a train",
-                                                "Re-plan proposed for approval", "Operator approves the re-plan"]
+    labels = [s["label"] for s in t["steps"]]
+    assert labels[:3] == ["Train cancelled; plan proposed for approval", "Operator approves the plan", "Conductor reports a bus overcrowded"]
+    assert labels[3].startswith("Depot deploys an extra ") and labels[4:] == ["Operator approves the re-plan", "Second-chart vacancies reported on a train",
+                                                                              "Operator approves the second re-plan"]
+    assert [s["type"] for s in t["steps"]] == ["TRAIN_CANCELLED", "APPROVE_BATCH", "LOAD_REPORT", "VEHICLE_DEPLOYED", "APPROVE_BATCH", "NOSHOWS_REPORTED", "APPROVE_BATCH"]
     assert not any("no-show" in s["label"].lower() or "no-show" in str(s["payload"]).lower() for s in t["steps"])      # relabelled: second chart
     played = []
     for n in range(7):
@@ -511,8 +513,9 @@ def test_assign_into_a_full_pool_gets_a_plain_message_and_the_constraint_detail(
     full = next(v for v in get(approved, "/api/capacity") if v["vehicle_id"] == "BUS-SPL-02")
     pool = next(p for p in full["pools"] if p["kind"] == "UNRESERVED")
     assert min(s["free"] for s in pool["segments"]) == 0                      # the tuned shortage: this bus is full
-    unresolved = next(d for d in get(approved, "/api/unresolved") if d["dest_place"] == "AVADI")["items"][0]
-    r = approved.post(f"/api/groups/{unresolved['group_id']}/override",
+    # any group going to Avadi that does not already hold a seat on this bus (the bus is full, so the database must refuse it)
+    group = next(g for g in get(approved, "/api/passengers?dest=AVADI&limit=500")["items"] if (g["allocation"] or {}).get("vehicle_id") != "BUS-SPL-02")
+    r = approved.post(f"/api/groups/{group['group_id']}/override",
                       json={"action": "ASSIGN", "reason": "force it", "pool_id": pool["pool_id"], "board_idx": 0, "alight_idx": len(full["stops"]) - 1})
     d = error(r, 409, "CapacityRejected")
     assert d["detail"] == "blocked by database capacity constraint"
@@ -551,3 +554,46 @@ def test_phone_websocket_push_has_kind_and_time(approved):
         approved.post(f"/api/batches/{pending['batch_id']}/approve")
         sms = ws.receive_json()
         assert sms["type"] == "sms" and sms["kind"] == "CHANGED" and len(sms["sent_at"]) == 5
+
+
+def test_depot_deploys_an_extra_special_that_takes_the_displaced_groups(approved):
+    over = get(approved, "/sim/timeline")["steps"][2]["payload"]["vehicle_id"]
+    before = {v["vehicle_id"]: v for v in get(approved, "/api/capacity")}
+    approved.post("/sim/inject-overcrowd")
+    stuck = get(approved, "/api/batches/pending")
+    displaced = stuck["items"]["DISPLACED"]
+    replaced_alone = sum(1 for i in displaced if i["detail"]["replaced"])
+    r = approved.post("/sim/deploy-bus")
+    assert r.status_code == 200 and r.json()["batch_id"]
+    after = {v["vehicle_id"]: v for v in get(approved, "/api/capacity")}
+    new = (set(after) - set(before)).pop()
+    assert after[new]["route_id"] == before[over]["route_id"] and after[new]["stops"] == before[over]["stops"] and after[new]["status"] == "SCHEDULED"
+    pend = get(approved, "/api/batches/pending")
+    on_new = [i for i in pend["items"]["DISPLACED"] if i["detail"]["vehicle_id"] == new]
+    assert len(on_new) >= max(replaced_alone, len(displaced) // 2)                  # most displaced groups now have a seat on the extra bus
+    assert all(i["detail"]["old_sms_still_held"] for i in pend["items"]["DISPLACED"])
+    error(approved.post("/sim/deploy-bus"), 409, "Rejected")                          # the same vehicle cannot be deployed twice
+    events = get(approved, "/api/events?limit=500&hide_rejected=false")["events"]
+    assert any(e["type"] == "VEHICLE_DEPLOYED" and e["payload"]["vehicle"]["vehicle_id"] == new for e in events)
+
+
+@pytest.mark.parametrize("seed", [42, 1, 2, 3, 99])
+def test_the_extra_bus_gives_every_displaced_group_a_seat_and_the_lowest_priority_one_ends_on_it(client, seed):
+    """The demo story: the overcrowded bus loses all its confirmed groups; the depot's extra special (same route, same capacity) takes them all."""
+    client.post("/sim/load-scenario", json={"seed": seed})
+    steps = get(client, "/sim/timeline")["steps"]
+    bus, extra = steps[2]["payload"]["vehicle_id"], steps[3]["payload"]["vehicle"]["vehicle_id"]
+    for _ in range(2):                                                          # cancel (plan), approve
+        client.post("/sim/timeline/next")
+    on_bus = [p for p in get(client, "/api/passengers?limit=500")["items"] if (p["allocation"] or {}).get("vehicle_id") == bus]
+    lowest = max(on_bus, key=lambda p: p["rank"])["group_id"]
+    client.post("/sim/timeline/next")                                           # the bus is reported overcrowded
+    before = {i["group_id"]: i["detail"] for i in get(client, "/api/batches/pending")["items"]["DISPLACED"]}
+    assert len(before) == len(on_bus) and not before[lowest]["replaced"]        # at first the lowest-priority group has no seat
+    client.post("/sim/timeline/next")                                           # the depot deploys the extra bus
+    after = {i["group_id"]: i["detail"] for i in get(client, "/api/batches/pending")["items"]["DISPLACED"]}
+    assert set(after) == set(before) and all(d["replaced"] for d in after.values())          # nobody is left without a seat
+    assert after[lowest]["vehicle_id"] == extra
+    client.post("/sim/timeline/next")                                           # approve: the moved groups are told they were moved
+    kinds = {get(client, f"/api/phone/{g}/messages")["messages"][-1]["kind"] for g in after}
+    assert kinds == {"CHANGED"}

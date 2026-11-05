@@ -18,6 +18,7 @@ TOPICS = {
     "TRAIN_CANCELLED": ["banner", "capacity", "passengers", "unresolved", "batch", "kpis"],
     "TRAIN_DELAYED": ["banner", "capacity", "passengers", "batch"],
     "ROAD_CLOSED": ["banner", "capacity", "passengers", "unresolved", "batch", "kpis"],
+    "VEHICLE_DEPLOYED": ["capacity", "field", "passengers", "unresolved", "batch", "kpis"],
     "VACANCY_UPDATE": ["capacity", "passengers", "unresolved", "batch", "kpis"],
     "NOSHOWS_REPORTED": ["capacity", "passengers", "unresolved", "batch", "kpis"],
     "LOAD_REPORT": ["capacity", "field", "passengers", "unresolved", "batch", "kpis"],

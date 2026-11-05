@@ -50,7 +50,7 @@ def test_demo_fails_when_nobody_is_notified_on_approval(tmp_path):
     assert play(Silent(), tmp=report) == 1
     data = json.loads(report.read_text(encoding="utf-8"))
     failed = [(s["step"], c["text"]) for s in data["steps"] for c in s["checks"] if not c["ok"]]
-    assert any(step == 3 and "SMS went to every confirmed group" in text for step, text in failed)
+    assert any(step == 2 and "SMS went to every confirmed group" in text for step, text in failed)
 
 
 def test_demo_fails_when_messages_leave_out_the_journey_times(tmp_path):

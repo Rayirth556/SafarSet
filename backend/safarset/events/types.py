@@ -49,6 +49,13 @@ class NoshowsReported(_Base):
     reported_by: str = ""
 
 
+class VehicleDeployed(_Base):
+    """The depot dispatches an extra vehicle that was not in the plan (for example another MTC special on the same route). The event
+    carries the vehicle's whole spec (same shape as a scenario vehicle), so the log is self-contained and replay rebuilds it."""
+    vehicle: dict
+    reported_by: str = ""
+
+
 class LoadReport(_Base):                            # ETM/conductor-shaped
     vehicle_id: str
     pool_id: str
@@ -158,7 +165,7 @@ EVENT_MODELS: dict[str, type[_Base]] = {
     "SCENARIO_LOADED": ScenarioLoaded, "TRAIN_CANCELLED": TrainCancelled, "TRAIN_DELAYED": TrainDelayed,
     "ROAD_CLOSED": RoadClosed, "VACANCY_UPDATE": VacancyUpdate, "NOSHOWS_REPORTED": NoshowsReported,
     "LOAD_REPORT": LoadReport, "PASSENGER_BOARDED": PassengerBoarded, "PASSENGER_DISPLACED": PassengerDisplaced,
-    "PLAN_PROPOSED": PlanProposed, "BATCH_APPROVED": BatchApproved, "SMS_SENT": SmsSent,
+    "PLAN_PROPOSED": PlanProposed, "BATCH_APPROVED": BatchApproved, "SMS_SENT": SmsSent, "VEHICLE_DEPLOYED": VehicleDeployed,
     "OPERATOR_OVERRIDE": OperatorOverride, "WEIGHTS_CHANGED": WeightsChanged, "BUFFER_CHANGED": BufferChanged,
     "SIM_PARAMS_CHANGED": SimParamsChanged, "COMMAND_REJECTED": CommandRejected, "CLOCK_SET": ClockSet,
     "GROUP_SELF_BOARDED": GroupSelfBoarded,

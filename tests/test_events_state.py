@@ -428,3 +428,39 @@ def test_overcrowded_without_count_equals_overcrowded_with_count_nominal(scenari
         apply_event(c, "LOAD_REPORT", "field", {"vehicle_id": BUS, "pool_id": BUS_POOL, **payload})
         outcomes.append([(r["group_id"], r["status"]) for r in q(c, "SELECT group_id, status FROM allocations ORDER BY id")])
     assert outcomes[0] == outcomes[1]
+
+
+# ------------------------------------------------------------------------------------------------- an extra vehicle deployed by the depot
+def _extra_special(scenario):
+    return next(s for s in scenario["timeline"]["steps"] if s["type"] == "VEHICLE_DEPLOYED")["payload"]["vehicle"]
+
+
+def test_deploying_a_vehicle_adds_its_stops_pools_and_segments(cancelled, scenario):
+    extra = _extra_special(scenario)
+    assert one(cancelled, "SELECT COUNT(*) FROM vehicles WHERE vehicle_id = ?", extra["vehicle_id"]) == 0
+    apply_event(cancelled, "VEHICLE_DEPLOYED", "sim", {"vehicle": extra}, ts_sim=880)
+    assert one(cancelled, "SELECT status FROM vehicles WHERE vehicle_id = ?", extra["vehicle_id"]) == "SCHEDULED"
+    assert one(cancelled, "SELECT COUNT(*) FROM vehicle_stops WHERE vehicle_id = ?", extra["vehicle_id"]) == len(extra["stops"])
+    pool = extra["pools"][0]
+    assert one(cancelled, "SELECT COUNT(*) FROM segment_capacity WHERE pool_id = ?", pool["pool_id"]) == len(pool["segments"])
+    assert one(cancelled, "SELECT MIN(cap) FROM segment_capacity WHERE pool_id = ?", pool["pool_id"]) == min(s["cap"] for s in pool["segments"]) > 0
+    assert check_invariants(cancelled) == []
+
+
+def test_a_deployed_vehicle_must_be_new_allocatable_and_complete(cancelled, scenario):
+    extra = _extra_special(scenario)
+    with pytest.raises(Rejected, match="already exists"):
+        apply_event(cancelled, "VEHICLE_DEPLOYED", "sim", {"vehicle": dict(extra, vehicle_id=BUS)})
+    with pytest.raises(Rejected, match="allocatable"):
+        apply_event(cancelled, "VEHICLE_DEPLOYED", "sim", {"vehicle": dict(extra, role="TRANSFER_LEG")})
+    with pytest.raises(Rejected, match="missing stops"):
+        apply_event(cancelled, "VEHICLE_DEPLOYED", "sim", {"vehicle": {k: v for k, v in extra.items() if k != "stops"}})
+    assert one(cancelled, "SELECT COUNT(*) FROM vehicles WHERE vehicle_id = ?", extra["vehicle_id"]) == 0      # nothing was half-written
+    assert one(cancelled, "SELECT COUNT(*) FROM events WHERE type = 'COMMAND_REJECTED'") == 3
+
+
+def test_replaying_a_log_with_a_deployed_vehicle_rebuilds_identical_state(cancelled, scenario):
+    apply_event(cancelled, "VEHICLE_DEPLOYED", "sim", {"vehicle": _extra_special(scenario)}, ts_sim=880)
+    fresh = new_db()
+    replay(cancelled, fresh)
+    assert state_dump(fresh) == state_dump(cancelled) and check_invariants(fresh) == []
