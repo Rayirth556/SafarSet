@@ -14,7 +14,7 @@ Nothing is ever sent to a passenger until a batch is approved (`POST /api/batche
 | Method and path | Purpose |
 |---|---|
 | `GET /state` | clock, disruption `banner`, `kpis`, `pending_batch` summary, `sim_params`, `last_seq` |
-| `GET /kpis` | `affected / tentative / confirmed / boarded / unresolved` as `{groups, heads}`, plus `displaced_awaiting_replacement`, `held_by_operator` |
+| `GET /kpis` | `affected / tentative / confirmed / boarded / unresolved` as `{groups, heads}`, plus `displaced_awaiting_replacement`, `held_by_operator`, and `composition` = `{pnr_heads, ticketed_unreserved_heads, unreserved_estimate: {heads, estimated: true}}` (affected PNR holders, affected ticketed-unreserved passengers, and a separate **estimate** of unregistered walk-ons that is NOT part of `affected`) |
 | `GET /capacity?role=ALLOCATION\|TRANSFER_LEG\|all` | per vehicle, per pool, per **segment**: `cap, confirmed, tentative, boarded, free`; `formula` (e.g. `"40 × 75% = 30"`), `buffer_pct`, `field_report {level,count}` (the "overcrowded" flag) |
 | `GET /passengers?status=&dest=&q=&limit=&offset=` | table: `score`, `rank`, `score_breakdown`, `state` (UNRESOLVED / TENTATIVE / CONFIRMED / BOARDED), `allocation`, `flags`, `displaced`, `held_by_operator` |
 | `GET /passengers/{group_id}/why` | the "Why" panel: fresh `score` + `rank`, stored allocation `reason` (machine-readable, with `text`), `decision_text`, `unresolved` (cause + ranked `alternatives`), `history` |

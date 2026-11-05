@@ -84,6 +84,19 @@ def test_disruption_banner_kpis_and_pending_batch(cancelled):
     assert {"group_id", "pnr", "size", "class", "dest_name", "detail"} <= set(first)
 
 
+def test_kpis_split_pnr_ticketed_unreserved_and_estimated_walkons(loaded):
+    idle = get(loaded, "/api/kpis")["composition"]
+    assert idle["pnr_heads"] == 0 and idle["ticketed_unreserved_heads"] == 0         # nobody is affected before the cancellation
+    loaded.post("/sim/cancel-train")
+    k = get(loaded, "/api/kpis")
+    c = k["composition"]
+    assert c["pnr_heads"] > 0 and c["ticketed_unreserved_heads"] > 0
+    assert c["pnr_heads"] + c["ticketed_unreserved_heads"] == k["affected"]["heads"]    # disjoint; the walk-on estimate is NOT part of affected
+    assert c["unreserved_estimate"]["estimated"] is True and c["unreserved_estimate"]["heads"] >= 0
+    assert c["unreserved_estimate"]["heads"] == loaded.app.state.safar.scenario["unreserved_estimate"]["heads"]
+    assert get(loaded, "/api/state")["kpis"]["composition"] == c
+
+
 def test_capacity_per_segment_with_buffer_formula_and_flags(cancelled):
     vehicles = get(cancelled, "/api/capacity")
     assert vehicles and all(v["role"] == "ALLOCATION" for v in vehicles)

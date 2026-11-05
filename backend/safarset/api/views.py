@@ -36,7 +36,13 @@ def kpis(conn):
     displaced = dstate.load_displaced(conn)
     held = dstate.load_held(conn)
     sizes = {r["group_id"]: r["size"] for r in _all(conn, "SELECT group_id, size FROM groups")}
-    return {"affected": affected, "tentative": out["TENTATIVE"], "confirmed": out["CONFIRMED"], "boarded": out["BOARDED"],
+    comp = _one(conn, """SELECT COALESCE(SUM(CASE WHEN reserved = 1 THEN size END), 0) pnr,
+                                COALESCE(SUM(CASE WHEN reserved = 0 THEN size END), 0) unres FROM groups WHERE affected = 1""")
+    est = _one(conn, "SELECT value FROM settings WHERE key = 'unreserved_estimate'")
+    # three disjoint populations: known PNR holders, ticketed unreserved (UTS) passengers, and an ESTIMATE of unregistered walk-ons
+    composition = {"pnr_heads": comp["pnr"], "ticketed_unreserved_heads": comp["unres"],
+                   "unreserved_estimate": {"heads": json.loads(est["value"]).get("heads", 0) if est else 0, "estimated": True}}
+    return {"composition": composition,"affected": affected, "tentative": out["TENTATIVE"], "confirmed": out["CONFIRMED"], "boarded": out["BOARDED"],
             "unresolved": out["UNRESOLVED"],
             "displaced_awaiting_replacement": {"groups": len(displaced), "heads": sum(sizes[g] for g in displaced)},
             "held_by_operator": {"groups": len(held), "heads": sum(h["size"] for h in held.values())}}

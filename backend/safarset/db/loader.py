@@ -36,5 +36,6 @@ def load_scenario(conn, seq, sc):
     for key, val in (("buffers", sc["buffers"]), ("class_rank", sc["class_rank"]),
                      ("scenario_meta", {"params": meta["params"], "cancel_min": meta["cancel_min"],
                                         "cancelled_vehicle_id": meta["cancelled_vehicle_id"], "label": meta["label"]}),
-                     ("behaviour", sc["behaviour"]), ("connections", sc["connections"])):
+                     ("behaviour", sc["behaviour"]), ("connections", sc["connections"]),
+                     ("unreserved_estimate", sc.get("unreserved_estimate", {"heads": 0}))):
         conn.execute("INSERT INTO settings (key, value, version, updated_seq) VALUES (?,?,1,?)", (key, _j(val), seq))

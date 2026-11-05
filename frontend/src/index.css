@@ -1,0 +1,88 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/jetbrains-mono";
+
+/* SafarSet design tokens (light theme only). Status pairs are bar colour / text colour. */
+:root {
+  --navy: #1f3a6e;
+  --saffron: #f39a2e;
+  --page: #f3f5f9;
+  --card: #ffffff;
+  --line: #dce1ea;
+  --ink: #1b2333;
+  --ink-2: #586274;
+  --confirmed: #2e9e64;
+  --confirmed-ink: #1e7d4f;
+  --tentative: #e8920f;
+  --tentative-ink: #a15c00;
+  --unresolved: #c62828;
+  --unresolved-ink: #b3261e;
+  --boarded: #1f5fae;
+
+  --background: var(--page);
+  --foreground: var(--ink);
+  --card-foreground: var(--ink);
+  --popover: var(--card);
+  --popover-foreground: var(--ink);
+  --primary: var(--saffron);
+  --primary-foreground: var(--ink);
+  --secondary: #e9edf4;
+  --secondary-foreground: var(--ink);
+  --muted: #e9edf4;
+  --muted-foreground: var(--ink-2);
+  --accent: #e9edf4;
+  --accent-foreground: var(--ink);
+  --destructive: var(--unresolved);
+  --border: var(--line);
+  --input: var(--line);
+  --ring: var(--navy);
+  --radius: 0.625rem;
+}
+
+@theme inline {
+  --font-sans: 'Inter Variable', system-ui, 'Nirmala UI', sans-serif;
+  --font-heading: var(--font-sans);
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+  --color-navy: var(--navy);
+  --color-saffron: var(--saffron);
+  --color-page: var(--page);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-confirmed: var(--confirmed);
+  --color-confirmed-ink: var(--confirmed-ink);
+  --color-tentative: var(--tentative);
+  --color-tentative-ink: var(--tentative-ink);
+  --color-unresolved: var(--unresolved);
+  --color-unresolved-ink: var(--unresolved-ink);
+  --color-boarded: var(--boarded);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-foreground: var(--foreground);
+  --color-background: var(--background);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  body { @apply bg-background text-foreground font-sans; }
+}

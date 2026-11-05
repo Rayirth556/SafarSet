@@ -54,6 +54,17 @@ curl localhost:8000/api/batches/pending                # the re-plan
 `python scripts/run_demo.py --url http://127.0.0.1:8000` runs the demo against a server that is already up;
 `--inprocess` needs no server; `--seed`, `--passengers` and `--json report.json` are also available. The exit code is 0 only if every check passes.
 
+### Frontend (React)
+
+Needs Node 20 or newer. One command starts the backend (:8000) and the Vite dev server (:5173, proxying `/api`, `/ws` and `/sim/*`):
+
+```
+python scripts/dev.py            # open http://localhost:5173  (add --load to load the seed-42 scenario)
+```
+
+Or by hand: `cd backend && uvicorn safarset.api.app:app` and, in `frontend/`, `npm install && npm run dev`.
+Checks: `cd frontend && npm test && npx tsc -b && npm run build`. Design reference images: `frontend/design/` (visual reference only; sample data is outdated).
+
 ### The scripted demo
 
 `GET /sim/timeline` lists it; `POST /sim/timeline/next` plays one step at a time (or `run_demo.py` plays all of them):
