@@ -56,7 +56,8 @@ The phone mock shows only `PHONE_MOCK` messages; real SMS (optional, behind a fl
 `GET|PUT /params` (compliance and walk-on sliders), `POST /clock` (logged as a `CLOCK_SET` event), `POST /depart/{vehicle_id}` (plan -> observe -> re-plan using the sliders: confirmed groups that ignore their allocation
 rush the earliest-departing vehicle toward their destination and add to its load; allocated groups board in priority order while there is room; the load
 report counts everyone present and OVERCROWDED displaces whoever is refused; rushers become BOARDED with `boarded_on_own` set),
-`GET /timeline`, `POST /timeline/next`, `POST /timeline/reset` (play the scripted demo one step at a time).
+`GET /timeline`, `POST /timeline/next`, `POST /timeline/reset` (play the scripted demo one step at a time; each step has a display `label`, for example "Second-chart vacancies reported on a train").
+An end-to-end script that plays all of it and checks the state at every step: `python scripts/run_demo.py`.
 
 ## 5. Live stream `WS /ws`
 On connect: `{"type":"snapshot","loaded","last_seq","clock","banner","kpis","pending_batch","sim_params"}`.

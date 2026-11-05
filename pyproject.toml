@@ -6,3 +6,7 @@ requires-python = ">=3.12"
 [tool.pytest.ini_options]
 pythonpath = ["backend"]
 testpaths = ["tests"]
+# A stuck test (for example a WebSocket waiting for a message that never comes) must fail, not hang the run.
+# "thread" works on Windows (the default "signal" method does not) and dumps the stack of every thread before aborting.
+timeout = 60
+timeout_method = "thread"
