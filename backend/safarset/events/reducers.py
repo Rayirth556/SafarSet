@@ -164,7 +164,7 @@ def vacancy_update(conn, seq, p):
 def noshows_reported(conn, seq, p):
     pool = _pool(conn, p.pool_id)
     if pool["vehicle_id"] != p.vehicle_id or pool["kind"] != "RESERVED":
-        raise Rejected("no-shows apply to a reserved pool of the stated vehicle")
+        raise Rejected("second-chart vacancies apply to a reserved pool of the stated vehicle")
     if p.to_seg > _nseg(conn, p.pool_id) or p.from_seg >= p.to_seg:
         raise Rejected("segment range outside the pool")
     caps = {}

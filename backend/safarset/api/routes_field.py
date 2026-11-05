@@ -1,4 +1,5 @@
-"""Field view endpoints (conductor / TTE on a phone). These stand in for the ETM and HHT feeds."""
+"""Field view endpoints (conductor / TTE on a phone). These stand in for the ETM load feed and the TTE hand-held terminal
+(second-chart vacancies)."""
 from fastapi import APIRouter, HTTPException, Request
 
 from . import models, views

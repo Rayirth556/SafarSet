@@ -1,5 +1,5 @@
 """Demo controls. NOT part of the product: every endpoint lives under /sim and drives the platform only through the same
-events a real feed would produce (cancellation, delay, closure, ETM load reports, HHT no-shows)."""
+events a real feed would produce (cancellation, delay, closure, ETM load reports, second-chart vacancies from the TTE hand-held terminal)."""
 import hashlib
 import json
 
@@ -94,11 +94,14 @@ async def inject_overcrowd(request: Request, body: models.InjectOvercrowdBody | 
     return _serialise(await st.mutate(lambda: st.engine.handle("LOAD_REPORT", "field", payload, st.clock)))
 
 
-@router.post("/inject-noshows")
-async def inject_noshows(request: Request, body: models.InjectNoshowsBody | None = None):
-    """A TTE's hand-held terminal reports no-shows: berths free up (defaults to the scripted step-5 train, pool and count)."""
+@router.post("/inject-vacancies")
+@router.post("/inject-noshows", deprecated=True)
+async def inject_vacancies(request: Request, body: models.InjectVacanciesBody | None = None):
+    """Second-chart vacancies: the railway's final chart (prepared about 30 min before departure) shows berths that are now
+    vacant, reported through the TTE hand-held terminal. Defaults to the scripted step-5 train, pool and count.
+    (`/inject-noshows` is the old name of this endpoint. The event type stays NOSHOWS_REPORTED.)"""
     st = _st(request)
-    body = body or models.InjectNoshowsBody()
+    body = body or models.InjectVacanciesBody()
     scripted = _timeline_step(st, 4)["payload"]
     vid = body.vehicle_id or scripted["vehicle_id"]
     pool = body.pool_id or (scripted["pool_id"] if vid == scripted["vehicle_id"] else None)
@@ -109,7 +112,7 @@ async def inject_noshows(request: Request, body: models.InjectNoshowsBody | None
         pool = r["pool_id"]
     nseg = st.conn.execute("SELECT COUNT(*) FROM segment_capacity WHERE pool_id = ?", (pool,)).fetchone()[0]
     seats = body.seats or (scripted["seats_freed"] if pool == scripted["pool_id"] else 4)
-    payload = {"vehicle_id": vid, "pool_id": pool, "seats_freed": seats, "from_seg": 0, "to_seg": nseg, "reported_by": "SIMULATED TTE HHT"}
+    payload = {"vehicle_id": vid, "pool_id": pool, "seats_freed": seats, "from_seg": 0, "to_seg": nseg, "reported_by": "SIMULATED second chart (TTE hand-held terminal)"}
     return _serialise(await st.mutate(lambda: st.engine.handle("NOSHOWS_REPORTED", "field", payload, st.clock)))
 
 
@@ -210,7 +213,7 @@ async def timeline(request: Request):
     st = _st(request)
     steps = st.scenario["timeline"]["steps"]
     return {"label": "SIMULATED", "next_step": st.timeline_idx, "total": len(steps),
-            "steps": [{k: s[k] for k in ("step", "at", "at_min", "kind", "type", "payload", "expect")} for s in steps]}
+            "steps": [{k: s[k] for k in ("step", "label", "at", "at_min", "kind", "type", "payload", "expect")} for s in steps]}
 
 
 @router.post("/timeline/next")
@@ -227,7 +230,7 @@ async def timeline_next(request: Request):
         return play_step(st.engine, step)
     res = await st.mutate(run)
     st.timeline_idx += 1
-    return {"played": {k: step[k] for k in ("step", "at", "kind", "type")}, "result": _serialise(res), "next_step": st.timeline_idx}
+    return {"played": {k: step[k] for k in ("step", "label", "at", "kind", "type")}, "result": _serialise(res), "next_step": st.timeline_idx}
 
 
 @router.post("/timeline/reset")

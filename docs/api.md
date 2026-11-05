@@ -40,7 +40,7 @@ Item `detail` flags for the UI:
 `GET /vehicles`, `GET /vehicles/{id}/manifest` (expected passengers, `can_board`),
 `POST /vehicles/{id}/board` `{allocation_id | group_id}` (only CONFIRMED can board),
 `POST /vehicles/{id}/load-report` `{level: NORMAL|FULL|OVERCROWDED, count?}` (stands in for the ETM; no count = treated as exactly full),
-`POST /vehicles/{id}/vacancy` `{pool_id, from_seg, to_seg, vacancy}` (stands in for the TTE hand-held terminal).
+`POST /vehicles/{id}/vacancy` `{pool_id, from_seg, to_seg, vacancy}` (second-chart vacancies: stands in for the TTE hand-held terminal; the railway prepares its final chart about 30 min before departure, true no-shows are known only around departure).
 A FULL/OVERCROWDED report displaces confirmed groups that have no physical room and triggers a re-plan.
 
 ## 3. Passenger phone mock
@@ -52,7 +52,7 @@ The phone mock shows only `PHONE_MOCK` messages; real SMS (optional, behind a fl
 
 ## 4. Demo controls (`/sim`, not part of the product)
 `POST /load-scenario` `{seed, n_passengers, pct_senior, pct_groups, compliance_rate, walkon_rate, ...}`,
-`POST /cancel-train`, `POST /delay-train`, `POST /close-road`, `POST /inject-overcrowd`, `POST /inject-noshows`,
+`POST /cancel-train`, `POST /delay-train`, `POST /close-road`, `POST /inject-overcrowd`, `POST /inject-vacancies` (second-chart vacancies; `/inject-noshows` is the deprecated old name),
 `GET|PUT /params` (compliance and walk-on sliders), `POST /clock` (logged as a `CLOCK_SET` event), `POST /depart/{vehicle_id}` (plan -> observe -> re-plan using the sliders: confirmed groups that ignore their allocation
 rush the earliest-departing vehicle toward their destination and add to its load; allocated groups board in priority order while there is room; the load
 report counts everyone present and OVERCROWDED displaces whoever is refused; rushers become BOARDED with `boarded_on_own` set),

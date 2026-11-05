@@ -37,7 +37,10 @@ class VacancyUpdate(_Base):                         # HHT-shaped: absolute vacan
     reported_by: str = ""
 
 
-class NoshowsReported(_Base):                       # TTE reports no-shows: frees seats on segments [from_seg, to_seg)
+class NoshowsReported(_Base):
+    """Second-chart vacancies: berths the railway's final chart (prepared about 30 min before departure) now shows vacant,
+    reported through the TTE hand-held terminal; frees seats on segments [from_seg, to_seg). The event type keeps its first
+    name; true no-shows are only known around departure."""
     vehicle_id: str
     pool_id: str
     seats_freed: int = Field(gt=0)

@@ -195,13 +195,14 @@ def test_every_allocatable_bus_serves_a_destination_and_buses_cover_avadi_and_po
     assert {"AVADI", "POONAMALLEE"} <= served_by_bus
 
 
-def test_noshow_report_falls_in_irs_second_chart_window_and_seats_stay_usable(sc):
+def test_second_chart_vacancies_fall_in_irs_final_chart_window_and_seats_stay_usable(sc):
     from safarset.domain import compat
     steps = sc["timeline"]["steps"]
-    noshow = steps[4]
-    train = next(v for v in sc["vehicles"] if v["vehicle_id"] == noshow["payload"]["vehicle_id"])
-    lead = train["depart_min"] - noshow["at_min"]
-    assert 5 <= lead <= 30, f"TTE reports {lead} min before departure; IR's second chart is prepared 30-5 min before"
+    chart = steps[4]
+    assert chart["label"] == "Second-chart vacancies reported on a train" and "second chart" in chart["payload"]["reported_by"]
+    train = next(v for v in sc["vehicles"] if v["vehicle_id"] == chart["payload"]["vehicle_id"])
+    lead = train["depart_min"] - chart["at_min"]
+    assert 5 <= lead <= 30, f"second-chart vacancies reported {lead} min before departure; IR's final chart is prepared 30-5 min before"
     ctx = {"now_min": steps[5]["at_min"], "min_checkin_min": {"TRAIN": 10, "BUS": 30}, "walk_m_per_min": 80}
     g = {"size": 1, "reserved": True, "class": "2S", "board_place": "CENTRAL", "dest_place": "ARAKKONAM", "requirements": {}, "attrs": {}}
     veh = dict(train, status="SCHEDULED", delay_min=0)

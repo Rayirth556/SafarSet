@@ -1,0 +1,5 @@
+{
+  "_note": "Notifier switches. The Tamil templates are a DRAFT until a native speaker reviews them. phone_mock_english_only: show English only on the passenger phone mock, whatever the passenger's language. sms_allow_tamil: let the optional REAL SMS channel send Tamil (keep false until the translation is reviewed; real SMS then goes out in English). Environment overrides: SAFARSET_PHONE_ENGLISH_ONLY=1|0, SAFARSET_SMS_ALLOW_TAMIL=1|0.",
+  "phone_mock_english_only": false,
+  "sms_allow_tamil": false
+}

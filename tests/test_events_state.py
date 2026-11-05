@@ -246,7 +246,7 @@ def test_vacancy_cut_releases_tentative_before_displacing_confirmed(cancelled):
     plan(cancelled, "B2", pool, train, "ARAKKONAM", [gs[2]], scores={gs[2]: 5.0})
     held = sum(one(cancelled, "SELECT size FROM groups WHERE group_id=?", g) for g in gs[:3])
     confirmed_heads = sum(one(cancelled, "SELECT size FROM groups WHERE group_id=?", g) for g in gs[:2])
-    # TTE: only `confirmed_heads` berths are really vacant -> tentative goes first, confirmed stay
+    # second chart: only `confirmed_heads` berths are really vacant -> tentative goes first, confirmed stay
     apply_event(cancelled, "VACANCY_UPDATE", "field", {"pool_id": pool, "from_seg": 0, "to_seg": hi, "vacancy": confirmed_heads})
     st = {r["group_id"]: r["status"] for r in q(cancelled, "SELECT group_id, status FROM allocations")}
     assert st[gs[2]] == "RELEASED" and st[gs[0]] == st[gs[1]] == "CONFIRMED"

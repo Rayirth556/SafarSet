@@ -26,13 +26,14 @@ def build_timeline(sc):
     count = round(pool["nominal"] * (1 + walkon_rate))
     t_over = bus["depart_min"] - 5
 
-    # Step 5: a TTE reports no-shows on the first alternate train that has not yet left at that time.
+    # Step 5: second-chart vacancies on the first alternate train that has not yet left at that time. IR prepares its final
+    # (second) chart about 30 min before departure and it shows berths now vacant; true no-shows are only known around departure.
     train = next(t for t in alt_trains if t["depart_min"] > t_over + 30)
     res = max((p for p in train["pools"] if p["kind"] == "RESERVED"), key=lambda p: (p["nominal"], p["pool_id"]))
     nseg = len(res["segments"])
     mean_vacancy = sum(s["vacancy"] for s in res["segments"]) / nseg
-    seats = max(4, round(0.25 * mean_vacancy))      # a realistic handful of no-shows, relative to what is free now
-    t_noshow = train["depart_min"] - 20      # IR prepares its second chart 30-5 min before departure; seats stay usable (train check-in lead is 10 min)
+    seats = max(4, round(0.25 * mean_vacancy))      # a realistic handful of newly vacant berths, relative to what is free now
+    t_chart = train["depart_min"] - 20      # IR prepares its second chart 30-5 min before departure; seats stay usable (train check-in lead is 10 min)
 
     steps = [
         {"step": 1, "at_min": cancel, "kind": "sim_event", "type": "TRAIN_CANCELLED",
@@ -47,17 +48,19 @@ def build_timeline(sc):
          "payload": {"vehicle_id": bus["vehicle_id"], "pool_id": pool["pool_id"], "level": "OVERCROWDED",
                      "count": count, "reported_by": "SIMULATED conductor ETM"},
          "expect": {"vehicle_flag": "overcrowded", "event_logged": True}},
-        {"step": 5, "at_min": t_noshow, "kind": "sim_event", "type": "NOSHOWS_REPORTED",
+        {"step": 5, "at_min": t_chart, "kind": "sim_event", "type": "NOSHOWS_REPORTED",
          "payload": {"vehicle_id": train["vehicle_id"], "pool_id": res["pool_id"], "seats_freed": seats,
-                     "from_seg": 0, "to_seg": nseg, "reported_by": "SIMULATED TTE HHT"},
+                     "from_seg": 0, "to_seg": nseg, "reported_by": "SIMULATED second chart (TTE hand-held terminal)"},
          "expect": {"vacancy_increase_seats": seats, "event_logged": True}},
-        {"step": 6, "at_min": t_noshow + 1, "kind": "system", "type": "PLAN_PROPOSED", "payload": {"replan": True},
+        {"step": 6, "at_min": t_chart + 1, "kind": "system", "type": "PLAN_PROPOSED", "payload": {"replan": True},
          "expect": {"batch_status": "PROPOSED", "over_allocated_segments": 0, "confirmed_frozen_except_displaced": True,
                     "diff_has_any_of": ["DISPLACED", "NEWLY_PLACED", "RESHUFFLED"]}},
-        {"step": 7, "at_min": t_noshow + 6, "kind": "operator_action", "type": "APPROVE_BATCH",
+        {"step": 7, "at_min": t_chart + 6, "kind": "operator_action", "type": "APPROVE_BATCH",
          "payload": {"batch": "latest"}, "expect": {"tentative_heads": 0, "sms_sent_for_every_changed_group": True}},
     ]
+    labels = {1: 'Train cancelled at origin', 2: 'Plan proposed for approval', 3: 'Operator approves the plan', 4: 'Conductor reports a bus overcrowded', 5: 'Second-chart vacancies reported on a train', 6: 'Re-plan proposed for approval', 7: 'Operator approves the re-plan'}
     for s in steps:
         s["at"] = _fmt(s["at_min"])
+        s["label"] = labels[s["step"]]
     assert all(a["at_min"] <= b["at_min"] for a, b in zip(steps, steps[1:])), "timeline must be time-ordered"
     return {"label": "SIMULATED", "steps": steps}

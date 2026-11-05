@@ -255,7 +255,7 @@ def test_phone_mock_receives_messages_only_after_approval(cancelled):
     msgs = get(cancelled, f"/api/phone/{pnr}/messages")
     assert len(msgs["messages"]) == 1 and msgs["pnr"] == pnr
     m = msgs["messages"][0]
-    assert "Reason:" in m["message"] or "காரணம்:" in m["message"]
+    assert any(x in m["message"] for x in ("Priority:", "Why:", "Changed:", "முன்னுரிமை:", "காரணம்:", "மாற்றம்:"))
     assert m["channel"] == "PHONE_MOCK" and m["reason"]
     group = next(i for i in get(cancelled, "/api/passengers")["items"] if i["pnr"] == pnr)["group_id"]
     assert get(cancelled, f"/api/phone/{group}/messages")["messages"] == msgs["messages"]  # addressable by group id too
@@ -263,7 +263,7 @@ def test_phone_mock_receives_messages_only_after_approval(cancelled):
 
 
 # ================================================================================================ demo controls
-def test_sim_delay_close_road_overcrowd_noshows_and_params(approved):
+def test_sim_delay_close_road_overcrowd_second_chart_vacancies_and_params(approved):
     r = approved.post("/sim/delay-train", json={"vehicle_id": "TRAIN-SIM-ALT-2", "delay_min": 45}).json()
     assert "seq" in r
     assert "Delay: TRAIN-SIM-ALT-2 +45 min" in [i["text"] for i in get(approved, "/api/state")["banner"]["items"]]
@@ -272,9 +272,10 @@ def test_sim_delay_close_road_overcrowd_noshows_and_params(approved):
     assert any("Road closure: waterlogging" in i["text"] for i in get(approved, "/api/state")["banner"]["items"])
     r = approved.post("/sim/inject-overcrowd").json()                                         # scripted defaults
     assert "LOAD_REPORT" in [e["type"] for e in get(approved, "/api/events?tail=true&limit=6")["events"]]
-    r = approved.post("/sim/inject-noshows", json={"vehicle_id": "TRAIN-SIM-ALT-1", "seats": 3}).json()
+    r = approved.post("/sim/inject-vacancies", json={"vehicle_id": "TRAIN-SIM-ALT-1", "seats": 3}).json()
     assert "seq" in r
-    error(approved.post("/sim/inject-noshows", json={"vehicle_id": "BUS-SPL-01"}), 422)       # a bus has no reserved pool
+    assert approved.post("/sim/inject-noshows", json={"vehicle_id": "TRAIN-SIM-ALT-1", "seats": 1}).status_code == 200      # deprecated alias still works
+    error(approved.post("/sim/inject-vacancies", json={"vehicle_id": "BUS-SPL-01"}), 422)       # a bus has no reserved pool
     assert get(approved, "/sim/params") == {"compliance_rate": 0.8, "walkon_rate": 0.3}
     assert approved.put("/sim/params", json={"compliance_rate": 0.5}).json() == {"compliance_rate": 0.5, "walkon_rate": 0.3}
     error(approved.put("/sim/params", json={"walkon_rate": 3}), 422)
@@ -354,6 +355,10 @@ def test_rushed_vehicles_displace_the_groups_refused_at_the_door_and_replan_them
 def test_scripted_timeline_can_be_played_step_by_step_and_reset(loaded):
     t = get(loaded, "/sim/timeline")
     assert t["total"] == 7 and t["next_step"] == 0 and [s["type"] for s in t["steps"]][0] == "TRAIN_CANCELLED"
+    assert [s["label"] for s in t["steps"]] == ["Train cancelled at origin", "Plan proposed for approval", "Operator approves the plan",
+                                                "Conductor reports a bus overcrowded", "Second-chart vacancies reported on a train",
+                                                "Re-plan proposed for approval", "Operator approves the re-plan"]
+    assert not any("no-show" in s["label"].lower() or "no-show" in str(s["payload"]).lower() for s in t["steps"])      # relabelled: second chart
     played = []
     for n in range(7):
         r = loaded.post("/sim/timeline/next")
@@ -424,9 +429,9 @@ def test_phone_websocket_delivers_only_that_passengers_sms(cancelled):
         other_phone.receive_json()
         cancelled.post("/api/batches/B1/approve")
         sms = phone.receive_json()
-        assert sms["type"] == "sms" and sms["group_id"] == tentative[0]["group_id"] and ("Reason:" in sms["message"] or "காரணம்:" in sms["message"]) and sms["channel"] == "PHONE_MOCK"
+        assert sms["type"] == "sms" and sms["group_id"] == tentative[0]["group_id"] and any(x in sms["message"] for x in ("Priority:", "Why:", "முன்னுரிமை:", "காரணம்:")) and sms["channel"] == "PHONE_MOCK"
         sms2 = other_phone.receive_json()
-        assert sms2["group_id"] == tentative[1]["group_id"] and sms2["message"] != sms["message"]
+        assert sms2["group_id"] == tentative[1]["group_id"] and sms2["group_id"] != sms["group_id"]        # each phone gets its own group's message
     with cancelled.websocket_connect(f"/ws/phone/{mine}") as late:
         h = late.receive_json()                                                             # a phone that connects later sees its history
         assert h["type"] == "history" and len(h["messages"]) == 1

@@ -131,13 +131,13 @@ def test_scripted_demo_timeline_plays_against_the_event_loop(world, scenario):
             assert res.batch_id and set(items(c, res.batch_id, "DISPLACED")) == displaced
             assert confirmed(c) == log["after_approval"]["confirmed"] - displaced                           # confirmed are frozen
             snapshot("after_overcrowd")
-        elif n == 5:                                                 # TTE reports no-shows: seats appear
+        elif n == 5:                                                 # second-chart vacancies: seats appear
             p = step["payload"]
             caps = [r["cap"] for r in rows(c, "SELECT cap FROM segment_capacity WHERE pool_id = ? ORDER BY seg_idx", p["pool_id"])]
             nominal = scalar(c, "SELECT nominal FROM pools WHERE pool_id = ?", p["pool_id"])
             assert all(cap <= nominal for cap in caps)
             assert scalar(c, "SELECT COUNT(*) FROM notifications") == log["after_approval"]["sms_rows"]
-            snapshot("after_noshows")
+            snapshot("after_vacancies")
         elif n == 6:                                                 # re-plan pending, fresh, confirmed still frozen
             pend = e.pending_batch()
             assert pend and not batch_is_stale(c, pend["batch_id"])
@@ -145,7 +145,7 @@ def test_scripted_demo_timeline_plays_against_the_event_loop(world, scenario):
             counts = diff_counts(c, pend["batch_id"])
             assert counts["DISPLACED"] > 0 or counts["NEWLY_PLACED"] > 0 or counts["RESHUFFLED"] > 0
         elif n == 7:                                                 # second approval: only changed groups are notified
-            before = log["after_noshows"]
+            before = log["after_vacancies"]
             assert set(res.confirmed_groups) == set(before["tentative"])
             assert confirmed(c) == before["confirmed"] | set(res.confirmed_groups)
             assert tentative(c) == {} and e.pending_batch() is None

@@ -273,7 +273,7 @@ def _alternatives(g, wait_pos, vehicles, free, connections, ctx, rank_map, tol):
     alts = [a for a in (_late_arrival(g, vehicles, free, ctx, rank_map, tol), _multi_leg(g, vehicles, free, connections, ctx)) if a]
     alts.sort(key=lambda a: (a["arrive_min"], a["type"]))
     alts.append({"type": "WAITLIST", "position": wait_pos, "destination": g["dest_place"],
-                 "note": "Re-planned automatically when capacity frees up (no-shows, extra vehicles)."})
+                 "note": "Re-planned automatically when capacity frees up (second-chart vacancies, extra vehicles)."})
     for i, a in enumerate(alts, 1):
         a["rank"] = i
     return alts

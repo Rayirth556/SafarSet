@@ -9,87 +9,123 @@ Every journey message names the vehicle, where to board, the times, the destinat
 The reason is generated from the allocation's machine-readable reason, so both languages explain the same decision.
 SMS cost: Tamil is sent as UCS-2 (70 characters per segment, 67 when joined); English is GSM-7 (160 / 153).
 
-## en: new journey by bus, earliest arrival, Avadi boarding with a walk
+## en: new journey by bus, priority factors (senior citizen, deadline)
 
-`NEW` / en / 236 characters, GSM-7, 2 segment(s)
+`NEW` / en / 193 characters, GSM-7, 2 segment(s)
 
-> SafarSet: your new journey is arranged. Take bus MTC 120 R1. Board at Nurse Quarters (about 260 m straight-line from Chennai Central). Departs 14:50; arrives Avadi at 15:57. Group of 3. Reason: it is the earliest arrival we could offer.
+> SafarSet: your new journey: bus MTC 120 R1. Board at Nurse Quarters (about 260 m from Chennai Central). Departs 14:50, arrives Avadi 15:57. Group of 3. Priority: senior citizen, deadline 20:00.
 
-## en: new journey by train, same class, an earlier option was full
+## en: new journey by bus, three priority factors (only the top two are shown)
 
-`NEW` / en / 288 characters, GSM-7, 2 segment(s)
+`NEW` / en / 191 characters, GSM-7, 2 segment(s)
 
-> SafarSet: your new journey is arranged. Take train 12607 (Lalbagh Express). Board at Chennai Central. Departs 15:30; arrives Arakkonam at 16:35. Group of 1. Reason: arrivals within 15 minutes count as equal, and this one keeps you closest to your ticket class; an earlier option was full.
+> SafarSet: your new journey: bus MTC 120 R1. Board at Nurse Quarters (about 260 m from Chennai Central). Departs 14:50, arrives Avadi 15:57. Group of 2. Priority: medical need, senior citizen.
+
+## en: new journey by bus, no priority factors (plain reason)
+
+`NEW` / en / 194 characters, GSM-7, 2 segment(s)
+
+> SafarSet: your new journey: bus MTC 120 R1. Board at Nurse Quarters (about 260 m from Chennai Central). Departs 14:50, arrives Avadi 15:57. Group of 1. Why: fastest option, in your booked class.
+
+## en: new journey by train, equal arrivals, booked class kept
+
+`NEW` / en / 193 characters, GSM-7, 2 segment(s)
+
+> SafarSet: your new journey: train 12607 (Lalbagh Express). Board at Chennai Central. Departs 15:30, arrives Arakkonam 16:35. Group of 1. Why: fastest option within 15 min, in your booked class.
 
 ## en: new journey with a class upgrade
 
-`NEW` / en / 256 characters, GSM-7, 2 segment(s)
+`NEW` / en / 196 characters, GSM-7, 2 segment(s)
 
-> SafarSet: your new journey is arranged. Take train 12607 (Lalbagh Express). Board at Chennai Central. Departs 15:30; arrives Katpadi at 17:35. Group of 2. Reason: it was the only option that fits your group; your seat is in a higher class than your ticket.
+> SafarSet: your new journey: train 12607 (Lalbagh Express). Board at Chennai Central. Departs 15:30, arrives Katpadi 17:35. Group of 2. Why: the only option that fits your group, in a higher class.
 
 ## en: new journey in a lower class (flagged)
 
-`NEW` / en / 259 characters, GSM-7, 2 segment(s)
+`NEW` / en / 185 characters, GSM-7, 2 segment(s)
 
-> SafarSet: your new journey is arranged. Take train 12607 (Lalbagh Express). Board at Chennai Central. Departs 15:30; arrives Katpadi at 17:35. Group of 2. Reason: it is the earliest arrival we could offer; NOTE: your seat is in a lower class than your ticket.
+> SafarSet: your new journey: train 12607 (Lalbagh Express). Board at Chennai Central. Departs 15:30, arrives Katpadi 17:35. Group of 2. Why: fastest option, in a LOWER class than booked.
 
 ## en: journey changed after the first bus was too crowded
 
-`CHANGED` / en / 280 characters, GSM-7, 2 segment(s)
+`CHANGED` / en / 208 characters, GSM-7, 2 segment(s)
 
-> SafarSet: your journey has CHANGED. Take bus MTC 101CT. Board at Mgr Central (about 100 m straight-line from Chennai Central). Departs 15:22; arrives Poonamallee at 16:21. Group of 2. Reason: because the vehicle was too crowded to board; it is the earliest arrival we could offer.
+> SafarSet: your journey has CHANGED: bus MTC 101CT. Board at Mgr Central (about 100 m from Chennai Central). Departs 15:22, arrives Poonamallee 16:21. Group of 2. Changed: the vehicle was too crowded to board.
+
+## en: journey changed to make room for another traveller
+
+`CHANGED` / en / 219 characters, GSM-7, 2 segment(s)
+
+> SafarSet: your journey has CHANGED: bus MTC 120 R1. Board at Nurse Quarters (about 260 m from Chennai Central). Departs 15:32, arrives Avadi 16:27. Group of 1. Moved to make room for another traveller (arrival +15 min).
 
 ## en: journey changed by the control room
 
-`CHANGED` / en / 266 characters, GSM-7, 2 segment(s)
+`CHANGED` / en / 189 characters, GSM-7, 2 segment(s)
 
-> SafarSet: your journey has CHANGED. Take bus MTC 120 R1. Board at Nurse Quarters (about 260 m straight-line from Chennai Central). Departs 14:50; arrives Avadi at 15:57. Group of 1. Reason: because the control room changed your journey; assigned by the control room.
+> SafarSet: your journey has CHANGED: bus MTC 120 R1. Board at Nurse Quarters (about 260 m from Chennai Central). Departs 14:50, arrives Avadi 15:57. Group of 1. Assigned by the control room.
 
 ## en: seat lost, no replacement yet (road closed)
 
-`DISPLACED_UNPLACED` / en / 137 characters, GSM-7, 1 segment(s)
+`DISPLACED_UNPLACED` / en / 117 characters, GSM-7, 1 segment(s)
 
-> SafarSet: your earlier seat is no longer available. We are finding another option and will message you again. Reason: the road is closed.
+> SafarSet: your earlier seat is gone. We are finding another option and will message you. Changed: the road is closed.
 
-## ta: new journey by bus, earliest arrival, Avadi boarding with a walk
+## ta: new journey by bus, priority factors (senior citizen, deadline)
 
-`NEW` / ta / 285 characters, UCS-2, 5 segment(s)
+`NEW` / ta / 202 characters, UCS-2, 4 segment(s)
 
-> SafarSet: உங்கள் புதிய பயணம் ஏற்பாடு செய்யப்பட்டுள்ளது. வாகனம்: பேருந்து MTC 120 R1. ஏறும் இடம்: Nurse Quarters (சென்னை சென்ட்ரலில் இருந்து நேர்கோட்டில் சுமார் 260 மீ). புறப்பாடு: 14:50. சேருமிடம்: ஆவடி, வருகை: 15:57. குழு: 3 பேர். காரணம்: நாங்கள் வழங்கக்கூடிய மிக விரைவான வருகை இதுவே.
+> SafarSet: புதிய பயணம்: பேருந்து MTC 120 R1. ஏறும் இடம்: Nurse Quarters (சென்னை சென்ட்ரலில் இருந்து சுமார் 260 மீ). புறப்பாடு 14:50, ஆவடி வருகை 15:57. 3 பேர். முன்னுரிமை: மூத்த குடிமகன், காலக்கெடு 20:00.
 
-## ta: new journey by train, same class, an earlier option was full
+## ta: new journey by bus, three priority factors (only the top two are shown)
 
-`NEW` / ta / 359 characters, UCS-2, 6 segment(s)
+`NEW` / ta / 202 characters, UCS-2, 4 segment(s)
 
-> SafarSet: உங்கள் புதிய பயணம் ஏற்பாடு செய்யப்பட்டுள்ளது. வாகனம்: ரயில் 12607 (Lalbagh Express). ஏறும் இடம்: சென்னை சென்ட்ரல். புறப்பாடு: 15:30. சேருமிடம்: அரக்கோணம், வருகை: 16:35. குழு: 1 பேர். காரணம்: வருகை நேரங்கள் 15 நிமிடத்திற்குள் ஒத்திருந்ததால், உங்கள் பயணச்சீட்டு வகுப்புக்கு மிக நெருக்கமான இருக்கை தேர்வு செய்யப்பட்டது; முந்தைய வாகனம் நிரம்பியிருந்தது.
+> SafarSet: புதிய பயணம்: பேருந்து MTC 120 R1. ஏறும் இடம்: Nurse Quarters (சென்னை சென்ட்ரலில் இருந்து சுமார் 260 மீ). புறப்பாடு 14:50, ஆவடி வருகை 15:57. 2 பேர். முன்னுரிமை: மருத்துவத் தேவை, மூத்த குடிமகன்.
+
+## ta: new journey by bus, no priority factors (plain reason)
+
+`NEW` / ta / 200 characters, UCS-2, 3 segment(s)
+
+> SafarSet: புதிய பயணம்: பேருந்து MTC 120 R1. ஏறும் இடம்: Nurse Quarters (சென்னை சென்ட்ரலில் இருந்து சுமார் 260 மீ). புறப்பாடு 14:50, ஆவடி வருகை 15:57. 1 பேர். காரணம்: மிக விரைவான வழி, உங்கள் வகுப்பில்.
+
+## ta: new journey by train, equal arrivals, booked class kept
+
+`NEW` / ta / 193 characters, UCS-2, 3 segment(s)
+
+> SafarSet: புதிய பயணம்: ரயில் 12607 (Lalbagh Express). ஏறும் இடம்: சென்னை சென்ட்ரல். புறப்பாடு 15:30, அரக்கோணம் வருகை 16:35. 1 பேர். காரணம்: 15 நிமிடத்திற்குள் மிக விரைவான வழி, உங்கள் வகுப்பில்.
 
 ## ta: new journey with a class upgrade
 
-`NEW` / ta / 305 characters, UCS-2, 5 segment(s)
+`NEW` / ta / 181 characters, UCS-2, 3 segment(s)
 
-> SafarSet: உங்கள் புதிய பயணம் ஏற்பாடு செய்யப்பட்டுள்ளது. வாகனம்: ரயில் 12607 (Lalbagh Express). ஏறும் இடம்: சென்னை சென்ட்ரல். புறப்பாடு: 15:30. சேருமிடம்: காட்பாடி, வருகை: 17:35. குழு: 2 பேர். காரணம்: உங்கள் குழுவுக்குப் பொருந்தும் ஒரே வாகனம் இதுவே; இருக்கை உங்கள் பயணச்சீட்டை விட உயர்ந்த வகுப்பில் உள்ளது.
+> SafarSet: புதிய பயணம்: ரயில் 12607 (Lalbagh Express). ஏறும் இடம்: சென்னை சென்ட்ரல். புறப்பாடு 15:30, காட்பாடி வருகை 17:35. 2 பேர். காரணம்: உங்கள் குழுவுக்கு ஒரே வழி, உயர் வகுப்பில்.
 
 ## ta: new journey in a lower class (flagged)
 
-`NEW` / ta / 315 characters, UCS-2, 5 segment(s)
+`NEW` / ta / 174 characters, UCS-2, 3 segment(s)
 
-> SafarSet: உங்கள் புதிய பயணம் ஏற்பாடு செய்யப்பட்டுள்ளது. வாகனம்: ரயில் 12607 (Lalbagh Express). ஏறும் இடம்: சென்னை சென்ட்ரல். புறப்பாடு: 15:30. சேருமிடம்: காட்பாடி, வருகை: 17:35. குழு: 2 பேர். காரணம்: நாங்கள் வழங்கக்கூடிய மிக விரைவான வருகை இதுவே; கவனிக்கவும்: இருக்கை உங்கள் பயணச்சீட்டை விட தாழ்ந்த வகுப்பில் உள்ளது.
+> SafarSet: புதிய பயணம்: ரயில் 12607 (Lalbagh Express). ஏறும் இடம்: சென்னை சென்ட்ரல். புறப்பாடு 15:30, காட்பாடி வருகை 17:35. 2 பேர். காரணம்: மிக விரைவான வழி, தாழ்ந்த வகுப்பில்.
 
 ## ta: journey changed after the first bus was too crowded
 
-`CHANGED` / ta / 322 characters, UCS-2, 5 segment(s)
+`CHANGED` / ta / 196 characters, UCS-2, 3 segment(s)
 
-> SafarSet: உங்கள் பயணம் மாற்றப்பட்டுள்ளது. வாகனம்: பேருந்து MTC 101CT. ஏறும் இடம்: Mgr Central (சென்னை சென்ட்ரலில் இருந்து நேர்கோட்டில் சுமார் 100 மீ). புறப்பாடு: 15:22. சேருமிடம்: பூந்தமல்லி, வருகை: 16:21. குழு: 2 பேர். காரணம்: வாகனத்தில் கூட்ட நெரிசல் காரணமாக ஏற முடியவில்லை; நாங்கள் வழங்கக்கூடிய மிக விரைவான வருகை இதுவே.
+> SafarSet: பயணம் மாற்றம்: பேருந்து MTC 101CT. ஏறும் இடம்: Mgr Central (சென்னை சென்ட்ரலில் இருந்து சுமார் 100 மீ). புறப்பாடு 15:22, பூந்தமல்லி வருகை 16:21. 2 பேர். மாற்றம்: வாகனத்தில் கூட்ட நெரிசல்.
+
+## ta: journey changed to make room for another traveller
+
+`CHANGED` / ta / 214 characters, UCS-2, 4 segment(s)
+
+> SafarSet: பயணம் மாற்றம்: பேருந்து MTC 120 R1. ஏறும் இடம்: Nurse Quarters (சென்னை சென்ட்ரலில் இருந்து சுமார் 260 மீ). புறப்பாடு 15:32, ஆவடி வருகை 16:27. 1 பேர். மற்றொரு பயணிக்கு இடம் அளிக்க மாற்றம் (வருகை +15 நிமி).
 
 ## ta: journey changed by the control room
 
-`CHANGED` / ta / 307 characters, UCS-2, 5 segment(s)
+`CHANGED` / ta / 189 characters, UCS-2, 3 segment(s)
 
-> SafarSet: உங்கள் பயணம் மாற்றப்பட்டுள்ளது. வாகனம்: பேருந்து MTC 120 R1. ஏறும் இடம்: Nurse Quarters (சென்னை சென்ட்ரலில் இருந்து நேர்கோட்டில் சுமார் 260 மீ). புறப்பாடு: 14:50. சேருமிடம்: ஆவடி, வருகை: 15:57. குழு: 1 பேர். காரணம்: கட்டுப்பாட்டு அறை உங்கள் பயணத்தை மாற்றியது; கட்டுப்பாட்டு அறையால் ஒதுக்கப்பட்டது.
+> SafarSet: பயணம் மாற்றம்: பேருந்து MTC 120 R1. ஏறும் இடம்: Nurse Quarters (சென்னை சென்ட்ரலில் இருந்து சுமார் 260 மீ). புறப்பாடு 14:50, ஆவடி வருகை 15:57. 1 பேர். கட்டுப்பாட்டு அறை ஒதுக்கியது.
 
 ## ta: seat lost, no replacement yet (road closed)
 
-`DISPLACED_UNPLACED` / ta / 150 characters, UCS-2, 3 segment(s)
+`DISPLACED_UNPLACED` / ta / 93 characters, UCS-2, 2 segment(s)
 
-> SafarSet: உங்கள் முந்தைய இருக்கை இனி கிடைக்காது. மாற்று ஏற்பாட்டைத் தேடுகிறோம்; புதிய தகவல் வந்ததும் செய்தி அனுப்புவோம். காரணம்: சாலை மூடப்பட்டுள்ளது.
+> SafarSet: உங்கள் இருக்கை இல்லை. மாற்று ஏற்பாடு செய்து தகவல் அனுப்புவோம். மாற்றம்: சாலை மூடல்.
 

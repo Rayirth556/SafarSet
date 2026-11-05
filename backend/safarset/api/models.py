@@ -88,10 +88,13 @@ class InjectOvercrowdBody(_Body):
     count: int | None = Field(default=None, ge=0)
 
 
-class InjectNoshowsBody(_Body):
+class InjectVacanciesBody(_Body):
     vehicle_id: str | None = None
     pool_id: str | None = None
     seats: int | None = Field(default=None, gt=0)
+
+
+InjectNoshowsBody = InjectVacanciesBody          # old name
 
 
 class SimParamsBody(_Body):
