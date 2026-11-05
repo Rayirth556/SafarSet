@@ -27,6 +27,7 @@ export function LiveProvider({ children }: { children: ReactNode }) {
     let retry: ReturnType<typeof setTimeout> | undefined
     let ping: ReturnType<typeof setInterval> | undefined
     let heard = Date.now()
+    let eventsTimer: ReturnType<typeof setTimeout> | undefined
 
     const router = new LiveRouter({
       invalidate: (topics) => {
@@ -37,8 +38,11 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       setKpis: (kpis: Kpis, clock, clockMin, seq) =>
         qc.setQueryData<AppState>(qk.state, (old) =>
           old && old.loaded ? { ...old, kpis, clock, clock_min: clockMin, last_seq: seq } : old),
-      // the event log refetches its tail; cheap because TanStack dedupes in-flight requests
-      onEvent: () => void qc.invalidateQueries({ queryKey: qk.events }),
+      // the event log refetches its tail, at most once per burst (approving a batch emits hundreds of events at once)
+      onEvent: () => {
+        if (eventsTimer) return
+        eventsTimer = setTimeout(() => { eventsTimer = undefined; void qc.invalidateQueries({ queryKey: qk.events }) }, 200)
+      },
       requestSnapshot: () => wsRef.current?.readyState === WebSocket.OPEN && wsRef.current.send(JSON.stringify({ type: 'snapshot' })),
       setSync: (s) => setStatus(s),
     })
@@ -62,7 +66,8 @@ export function LiveProvider({ children }: { children: ReactNode }) {
       ws.onerror = () => ws.close()
     }
 
-    connect()
+    // deferred so React StrictMode's throw-away first mount never opens (and immediately closes) a socket
+    const start = setTimeout(connect, 0)
     ping = setInterval(() => {
       const ws = wsRef.current
       if (!ws || ws.readyState !== WebSocket.OPEN) return
@@ -72,6 +77,8 @@ export function LiveProvider({ children }: { children: ReactNode }) {
 
     return () => {
       closed = true
+      clearTimeout(start)
+      clearTimeout(eventsTimer)
       clearTimeout(retry)
       clearInterval(ping)
       wsRef.current?.close()

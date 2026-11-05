@@ -17,13 +17,11 @@ const text: [string, string, string][] = [
   ['white on navy', '#ffffff', navy], ['ink on saffron (Approve)', ink, saffron],
   ['confirmed text', '#1e7d4f', card], ['tentative text', '#a15c00', card], ['unresolved text', '#b3261e', card], ['boarded text', '#1f5fae', card],
 ]
-// Known deviation: the specified tentative amber (#e8920f) is 2.46:1 on white. Tokens are the owner's, so it is kept, and bars never rely on
-// colour alone (every segment has a numeric label and tentative segments get a darker outline). Reported at the end of F1.
-const marks: [string, string, number][] = [
-  ['confirmed bar', '#2e9e64', 3], ['tentative bar', '#e8920f', 2.4], ['unresolved bar', '#c62828', 3], ['boarded bar', '#1f5fae', 3],
+const marks: [string, string][] = [
+  ['confirmed bar', '#2e9e64'], ['tentative bar', '#c27803'], ['unresolved bar', '#c62828'], ['boarded bar', '#1f5fae'],
 ]
 
 describe('design token contrast', () => {
   for (const [name, fg, bg] of text) it(`${name} >= 4.5:1`, () => expect(ratio(fg, bg)).toBeGreaterThanOrEqual(4.5))
-  for (const [name, c, min] of marks) it(`${name} >= ${min}:1 on card`, () => expect(ratio(c, card)).toBeGreaterThanOrEqual(min))
+  for (const [name, c] of marks) it(`${name} >= 3:1 on card`, () => expect(ratio(c, card)).toBeGreaterThanOrEqual(3))
 })

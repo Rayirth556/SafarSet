@@ -15,7 +15,7 @@
   --ink-2: #586274;
   --confirmed: #2e9e64;
   --confirmed-ink: #1e7d4f;
-  --tentative: #e8920f;
+  --tentative: #c27803;       /* bar colour: darkened from the mockup's #e8920f so it reaches 3:1 on white */
   --tentative-ink: #a15c00;
   --unresolved: #c62828;
   --unresolved-ink: #b3261e;

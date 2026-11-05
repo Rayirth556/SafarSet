@@ -8,12 +8,14 @@ import type {
 const enc = encodeURIComponent
 
 // ------------------------------------------------------------------ operator (/api)
-/** Before a scenario is loaded the server answers 409 NoScenario; that is a normal state, not an error. */
+/** Before a scenario is loaded there is nothing to fetch. `/health` says so without a 409, which the browser would log as an error. */
 export async function fetchState(): Promise<AppState> {
+  const health = await get<{ scenario_loaded: boolean }>('/health')
+  if (!health.scenario_loaded) return { loaded: false, last_seq: 0 }
   try {
     return await get<AppState>('/api/state')
   } catch (e) {
-    if (e instanceof ApiError && e.kind === 'NoScenario') return { loaded: false, last_seq: 0 }
+    if (e instanceof ApiError && e.kind === 'NoScenario') return { loaded: false, last_seq: 0 }   // lost a race with a restart
     throw e
   }
 }
