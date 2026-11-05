@@ -18,7 +18,7 @@ class FakeNotifier:
     def __init__(self):
         self.calls = []
 
-    def notify(self, group, allocation, kind):
+    def notify(self, group, allocation, kind, ctx=None):
         self.calls.append((group["group_id"], kind, allocation["id"] if allocation else None))
         return {"channel": "PHONE_MOCK", "lang": group["attrs"]["language"], "message": f"{kind} {group['group_id']}",
                 "reason": allocation["reason"]["text"] if allocation else None}

@@ -101,6 +101,18 @@ class SmsSent(_Base):
     lang: str
     message: str
     reason: str | None = None
+    status: Literal["SENT", "FAILED", "SKIPPED"] = "SENT"
+    detail: dict | None = None                       # e.g. encoding / segments, or why a real SMS failed or was skipped
+
+
+class ClockSet(_Base):                              # demo clock moves are logged so replay and restarts see the same clock
+    to_min: int = Field(ge=0, le=2880)
+
+
+class GroupSelfBoarded(_Base):                      # a confirmed group ignored its allocation and boarded another vehicle
+    group_id: str
+    vehicle_id: str
+    reason: str = ""
 
 
 class OperatorOverride(_Base):
@@ -145,5 +157,6 @@ EVENT_MODELS: dict[str, type[_Base]] = {
     "LOAD_REPORT": LoadReport, "PASSENGER_BOARDED": PassengerBoarded, "PASSENGER_DISPLACED": PassengerDisplaced,
     "PLAN_PROPOSED": PlanProposed, "BATCH_APPROVED": BatchApproved, "SMS_SENT": SmsSent,
     "OPERATOR_OVERRIDE": OperatorOverride, "WEIGHTS_CHANGED": WeightsChanged, "BUFFER_CHANGED": BufferChanged,
-    "SIM_PARAMS_CHANGED": SimParamsChanged, "COMMAND_REJECTED": CommandRejected,
+    "SIM_PARAMS_CHANGED": SimParamsChanged, "COMMAND_REJECTED": CommandRejected, "CLOCK_SET": ClockSet,
+    "GROUP_SELF_BOARDED": GroupSelfBoarded,
 }

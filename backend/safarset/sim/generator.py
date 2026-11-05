@@ -385,6 +385,11 @@ def _build_vehicles(seed, w, p, buffers, cancel_min, exclude_trains=()):
         vehicles.append(_bus_vehicle(f"IC-REG-KOY-{k + 1:02d}", "TRANSFER_LEG", LABEL_SIM, "SIM-IC-KOY", stops, board,
                                      ic_nom["capacity"], ic_nom["label"], "INTERCITY_BUS", buffers, committed, 0,
                                      False, dep))
+    for v in vehicles:                                     # passenger-facing names (used in SMS): MTC route numbers, labelled intercity buses
+        if v["mode"] == "BUS":
+            rid = v.get("route_id", "")
+            v["name"] = (f"MTC {w['routes'][rid]['short_name']}" if rid in w["routes"]
+                         else "Special intercity bus (SIMULATED)" if v["vehicle_id"].startswith("IC-SPL") else "Intercity bus (SIMULATED)")
     return vehicles, cancelled[1], warnings
 
 

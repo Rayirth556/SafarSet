@@ -22,6 +22,12 @@ async def get_state(request: Request):
     return st.snapshot() | {"type": "state"}
 
 
+@router.get("/notifier")
+async def get_notifier(request: Request):
+    """Which notification backends are live: the phone mock always; real SMS only when enabled by the environment flag."""
+    return request.app.state.safar.notifier.status() if hasattr(request.app.state.safar.notifier, "status") else {"phone_mock": True}
+
+
 @router.get("/kpis")
 async def get_kpis(request: Request):
     return views.kpis(_st(request).conn)

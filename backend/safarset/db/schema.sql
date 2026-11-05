@@ -104,7 +104,9 @@ CREATE TABLE groups (
     booking_time INTEGER NOT NULL, waiting_since INTEGER NOT NULL,
     requirements TEXT NOT NULL CHECK (json_valid(requirements)),
     attrs TEXT NOT NULL CHECK (json_valid(attrs)),     -- flexible: extra fields need no migration
-    affected INTEGER NOT NULL DEFAULT 0 CHECK (affected IN (0,1))
+    affected INTEGER NOT NULL DEFAULT 0 CHECK (affected IN (0,1)),
+    -- the group ignored its allocation and boarded this vehicle on its own (no seat is recorded for it; the load report counts it)
+    self_boarded_vehicle TEXT REFERENCES vehicles(vehicle_id)
 );
 
 -- ---------------------------------------------------------------- plans and allocations
@@ -212,6 +214,8 @@ CREATE TABLE group_holds (
 CREATE TABLE notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT, group_id TEXT NOT NULL REFERENCES groups(group_id),
     channel TEXT NOT NULL, lang TEXT NOT NULL, message TEXT NOT NULL, reason TEXT,
+    status TEXT NOT NULL DEFAULT 'SENT' CHECK (status IN ('SENT','FAILED','SKIPPED')),
+    detail TEXT CHECK (detail IS NULL OR json_valid(detail)),
     sent_seq INTEGER NOT NULL
 );
 
@@ -230,6 +234,7 @@ FROM segment_capacity s;
 CREATE VIEW v_group_state AS
 SELECT g.group_id, g.size, g.affected,
        CASE WHEN g.affected = 0 THEN 'UNAFFECTED'
+            WHEN g.self_boarded_vehicle IS NOT NULL THEN 'BOARDED'
             ELSE COALESCE((SELECT a.status FROM allocations a WHERE a.group_id = g.group_id
                             AND a.status IN ('TENTATIVE','CONFIRMED','BOARDED')), 'UNRESOLVED') END AS state
 FROM groups g;

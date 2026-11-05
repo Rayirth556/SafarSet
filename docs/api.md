@@ -19,11 +19,12 @@ Nothing is ever sent to a passenger until a batch is approved (`POST /api/batche
 | `GET /passengers?status=&dest=&q=&limit=&offset=` | table: `score`, `rank`, `score_breakdown`, `state` (UNRESOLVED / TENTATIVE / CONFIRMED / BOARDED), `allocation`, `flags`, `displaced`, `held_by_operator` |
 | `GET /passengers/{group_id}/why` | the "Why" panel: fresh `score` + `rank`, stored allocation `reason` (machine-readable, with `text`), `decision_text`, `unresolved` (cause + ranked `alternatives`), `history` |
 | `GET /unresolved` | unresolved demand grouped by destination with `reason`, ranked `alternatives` (`LATE_ARRIVAL`, `MULTI_LEG`, `WAITLIST`), `blocking_groups` / `blocking_why` |
-| `GET /batches/pending` | approval panel (null when none): `batch_id`, `cause`, `stale`, `diff` counts, `items` grouped by category |
+| `GET /batches/pending` | approval panel (null when none): `batch_id`, `cause`, `stale`, **`weights_out_of_date`** (the operator edited the weights after this plan was made and has not re-run), `diff` counts, `items` grouped by category |
 | `GET /batches`, `GET /batches/{id}` | history and any batch |
 | `POST /batches/{id}/approve` | approve (moves TENTATIVE to CONFIRMED and sends SMS). `409 StaleBatch` if capacity it uses changed: re-plan, never approve as-is |
 | `POST /replan` `{fresh?, weights?}` | new pending batch. With `weights` = "adjust weights and re-run": plans from scratch, batch `cause` is `WEIGHTS_RERUN` |
 | `GET /rules`, `PUT /rules` `{weights?, buffers?}` | weights (exact key set) and buffers per mode. A buffer below confirmed+boarded is `409 BufferRejected` and nothing changes |
+| `GET /notifier` | which backends are live: phone mock (always), real SMS (only when enabled by `SAFARSET_SMS_*`), languages, Tamil review status |
 | `GET /events?after=&limit=&hide_rejected=true&tail=false` | event log. `COMMAND_REJECTED` rows are hidden unless `hide_rejected=false`; `tail=true` returns the newest `limit` |
 | `POST /groups/{group_id}/override` `{action: ASSIGN\|UNASSIGN\|RESUME_AUTO, reason, pool_id?, board_idx?, alight_idx?}` | operator override; **reason is mandatory** and logged |
 
@@ -45,12 +46,16 @@ A FULL/OVERCROWDED report displaces confirmed groups that have no physical room 
 ## 3. Passenger phone mock
 `GET /api/phone/{pnr_or_group_id}/messages`; live stream `WS /ws/phone/{pnr_or_group_id}`:
 first `{"type":"history","found":bool,"messages":[...]}`, then `{"type":"sms","group_id","channel","lang","message","reason"}`.
-(Message wording is a placeholder until Phase 7 adds the English/Tamil templates.)
+Each message names the vehicle, where to board, the times, the destination, the group size and the **reason**, in the group's language
+(`en` / `ta`; the Tamil is a draft that needs native review). Samples: `docs/messages.md`. `detail` has `chars`, `encoding`, `segments`.
+The phone mock shows only `PHONE_MOCK` messages; real SMS (optional, behind a flag) is a separate `SMS_HTTP` record.
 
 ## 4. Demo controls (`/sim`, not part of the product)
 `POST /load-scenario` `{seed, n_passengers, pct_senior, pct_groups, compliance_rate, walkon_rate, ...}`,
 `POST /cancel-train`, `POST /delay-train`, `POST /close-road`, `POST /inject-overcrowd`, `POST /inject-noshows`,
-`GET|PUT /params` (compliance and walk-on sliders), `POST /clock`, `POST /depart/{vehicle_id}` (plan -> observe -> re-plan using the sliders),
+`GET|PUT /params` (compliance and walk-on sliders), `POST /clock` (logged as a `CLOCK_SET` event), `POST /depart/{vehicle_id}` (plan -> observe -> re-plan using the sliders: confirmed groups that ignore their allocation
+rush the earliest-departing vehicle toward their destination and add to its load; allocated groups board in priority order while there is room; the load
+report counts everyone present and OVERCROWDED displaces whoever is refused; rushers become BOARDED with `boarded_on_own` set),
 `GET /timeline`, `POST /timeline/next`, `POST /timeline/reset` (play the scripted demo one step at a time).
 
 ## 5. Live stream `WS /ws`

@@ -255,7 +255,8 @@ def test_phone_mock_receives_messages_only_after_approval(cancelled):
     msgs = get(cancelled, f"/api/phone/{pnr}/messages")
     assert len(msgs["messages"]) == 1 and msgs["pnr"] == pnr
     m = msgs["messages"][0]
-    assert "Why:" in m["message"] and m["channel"] == "PHONE_MOCK" and m["reason"]
+    assert "Reason:" in m["message"] or "காரணம்:" in m["message"]
+    assert m["channel"] == "PHONE_MOCK" and m["reason"]
     group = next(i for i in get(cancelled, "/api/passengers")["items"] if i["pnr"] == pnr)["group_id"]
     assert get(cancelled, f"/api/phone/{group}/messages")["messages"] == msgs["messages"]  # addressable by group id too
     error(cancelled.get("/api/phone/NOPE/messages"), 404, "NotFound")
@@ -281,25 +282,73 @@ def test_sim_delay_close_road_overcrowd_noshows_and_params(approved):
     assert get(approved, "/api/state")["clock"] == "15:05"
 
 
-def test_sim_depart_uses_the_compliance_and_walkon_sliders(approved):
-    vid = next(v["vehicle_id"] for v in get(approved, "/api/field/vehicles") if v["vehicle_id"].startswith("BUS-SPL")
-               and get(approved, f"/api/field/vehicles/{v['vehicle_id']}/manifest")["expected_heads"] > 0)
-    approved.put("/sim/params", json={"compliance_rate": 1.0, "walkon_rate": 0.0})
-    out = approved.post(f"/sim/depart/{vid}").json()
-    assert out["ignored_plan_groups"] == [] and out["boarded_groups"] and out["load_report"]["walk_ons"] == 0
-    assert out["load_report"]["level"] in ("NORMAL", "FULL")                                  # 30-seat buffer, no walk-ons: not overcrowded
-    error(approved.post("/sim/depart/NOPE"), 404)
+def depart_everything(c, compliance, walkon):
+    """Approve the first plan, set the sliders, then depart every allocatable vehicle in departure order."""
+    c.post("/sim/load-scenario", json={"seed": 42})
+    c.post("/sim/cancel-train")
+    c.post("/api/batches/B1/approve")
+    c.put("/sim/params", json={"compliance_rate": compliance, "walkon_rate": walkon})
+    out = {}
+    for v in sorted(get(c, "/api/field/vehicles"), key=lambda v: (v["depart"], v["vehicle_id"])):
+        out[v["vehicle_id"]] = c.post(f"/sim/depart/{v['vehicle_id']}").json()
+    return out
 
 
-def test_sim_depart_with_no_compliance_displaces_everyone_and_replans(approved):
-    vid = next(v["vehicle_id"] for v in get(approved, "/api/field/vehicles") if v["vehicle_id"].startswith("BUS-SPL")
-               and get(approved, f"/api/field/vehicles/{v['vehicle_id']}/manifest")["expected_heads"] > 0)
-    approved.put("/sim/params", json={"compliance_rate": 0.0, "walkon_rate": 0.5})
-    out = approved.post(f"/sim/depart/{vid}").json()
-    assert out["boarded_groups"] == [] and out["ignored_plan_groups"]
-    assert out["load_report"]["walk_ons"] == 20 and out["load_report"]["count"] == 20 and out["load_report"]["level"] == "NORMAL"   # 50% of 40 seats
-    assert get(approved, f"/api/field/vehicles/{vid}/manifest")["expected_heads"] == 0
-    assert get(approved, "/api/kpis")["displaced_awaiting_replacement"]["groups"] == len(out["ignored_plan_groups"])
+def overload(out):
+    return {vid: r["load_report"]["count"] - r["load_report"]["nominal"] for vid, r in out.items() if r["load_report"]}
+
+
+def test_full_compliance_and_no_walkons_never_overcrowds_and_nobody_vanishes(client):
+    out = depart_everything(client, 1.0, 0.0)
+    assert all(r["load_report"]["level"] != "OVERCROWDED" for r in out.values() if r["load_report"])
+    assert all(r["rusher_groups"] == [] and r["refused_groups"] == [] for r in out.values())
+    k = get(client, "/api/kpis")
+    assert k["tentative"]["heads"] + k["confirmed"]["heads"] + k["boarded"]["heads"] + k["unresolved"]["heads"] == k["affected"]["heads"] == 300
+    assert k["boarded"]["heads"] > 0
+
+
+def test_compliance_slider_at_70_percent_overcrowds_vehicles_through_rushers(client):
+    """Ignorers board the earliest-departing vehicle toward their destination and add to its load: with walk-ons switched
+    off, the rushers alone push some vehicle past its seats, and the field report flags it."""
+    out = depart_everything(client, 0.7, 0.0)
+    crowded = {vid: r for vid, r in out.items() if r["load_report"] and r["load_report"]["level"] == "OVERCROWDED"}
+    assert crowded, "70% compliance must produce at least one OVERCROWDED-worthy load"
+    for vid, r in crowded.items():
+        lr = r["load_report"]
+        assert lr["rushers_heads"] > 0 and lr["count"] == lr["committed"] + lr["rushers_heads"] + lr["allocated_heads"] > lr["nominal"]
+        pool = next(p for v in get(client, "/api/capacity") if v["vehicle_id"] == vid for p in v["pools"] if p["pool_id"] == lr["pool_id"])
+        assert pool["field_report"]["level"] == "OVERCROWDED" and pool["field_report"]["count"] == lr["count"]
+
+
+def test_compliance_and_walkons_compare_against_perfect_compliance_with_the_same_walkons(client):
+    default_walkons = overload(depart_everything(client, 1.0, 0.3))
+    ignoring = overload(depart_everything(client, 0.7, 0.3))
+    assert any(v > 0 for v in ignoring.values())                                         # OVERCROWDED-worthy at 70%
+    assert any(ignoring[vid] > default_walkons[vid] for vid in ignoring)                  # the ignorers add to some vehicle's load
+
+
+def test_ignorers_never_vanish_they_board_somewhere_and_free_their_old_seat(client):
+    out = depart_everything(client, 0.7, 0.0)
+    rushers = {g: vid for vid, r in out.items() for g in r["rusher_groups"]}
+    assert rushers
+    assert len(rushers) == sum(len(r["rusher_groups"]) for r in out.values())            # nobody boards twice
+    for gid, vid in list(rushers.items())[:15]:
+        why = get(client, f"/api/passengers/{gid}/why")
+        assert why["state"] == "BOARDED" and why["boarded_on_own"] == vid and why["allocation"] is None
+        released = [h for h in why["history"] if h["status"] == "RELEASED"]
+        assert released and released[-1]["status_reason"]["cause"] == "SELF_BOARDED" and released[-1]["status_reason"]["vehicle_id"] == vid
+    k = get(client, "/api/kpis")
+    assert k["tentative"]["heads"] + k["confirmed"]["heads"] + k["boarded"]["heads"] + k["unresolved"]["heads"] == k["affected"]["heads"] == 300
+    error(client.post("/sim/depart/NOPE"), 404)
+
+
+def test_rushed_vehicles_displace_the_groups_refused_at_the_door_and_replan_them(client):
+    out = depart_everything(client, 0.7, 0.3)
+    refused = [(vid, g) for vid, r in out.items() for g in r["refused_groups"]]
+    assert refused
+    for vid, gid in refused[:10]:
+        why = get(client, f"/api/passengers/{gid}/why")
+        assert why["state"] != "CONFIRMED" and any(h["status"] == "DISPLACED" for h in why["history"]) or why["state"] in ("TENTATIVE", "BOARDED")
 
 
 def test_scripted_timeline_can_be_played_step_by_step_and_reset(loaded):
@@ -375,7 +424,7 @@ def test_phone_websocket_delivers_only_that_passengers_sms(cancelled):
         other_phone.receive_json()
         cancelled.post("/api/batches/B1/approve")
         sms = phone.receive_json()
-        assert sms["type"] == "sms" and sms["group_id"] == tentative[0]["group_id"] and "Why:" in sms["message"] and sms["channel"] == "PHONE_MOCK"
+        assert sms["type"] == "sms" and sms["group_id"] == tentative[0]["group_id"] and ("Reason:" in sms["message"] or "காரணம்:" in sms["message"]) and sms["channel"] == "PHONE_MOCK"
         sms2 = other_phone.receive_json()
         assert sms2["group_id"] == tentative[1]["group_id"] and sms2["message"] != sms["message"]
     with cancelled.websocket_connect(f"/ws/phone/{mine}") as late:
@@ -383,3 +432,57 @@ def test_phone_websocket_delivers_only_that_passengers_sms(cancelled):
         assert h["type"] == "history" and len(h["messages"]) == 1
     with cancelled.websocket_connect("/ws/phone/UNKNOWN") as ghost:
         assert ghost.receive_json()["found"] is False
+
+
+# ================================================================================================ replay with clock changes
+def test_replay_gives_identical_state_when_the_clock_was_moved(client):
+    from safarset.db.conn import new_db
+    from safarset.db.invariants import state_dump
+    from safarset.domain.loop import Engine
+    from safarset.events.apply import replay
+    client.post("/sim/load-scenario", json={"seed": 42})
+    client.post("/sim/clock", json={"to_min": 850})
+    for _ in range(3):                                                    # cancel, plan, approve (each step moves the clock)
+        assert client.post("/sim/timeline/next").status_code == 200
+    client.post("/sim/clock", json={"to_min": 880})
+    client.post("/sim/inject-overcrowd")
+    client.post("/sim/clock", json={"to_min": 900})                       # a clock move with no event after it
+    st = client.app.state.safar
+    assert [e["type"] for e in get(client, "/api/events?hide_rejected=false&limit=2000")["events"] if e["type"] == "CLOCK_SET"]
+    fresh = new_db()
+    replay(st.conn, fresh)
+    assert state_dump(fresh) == state_dump(st.conn)
+    restored = Engine.restore(fresh)
+    assert restored.clock == st.engine.clock == 900                         # the clock itself survives a rebuild from the log
+
+
+def test_clock_moves_are_logged_events_with_scenario_time(loaded):
+    loaded.post("/sim/clock", json={"to_min": 905})
+    ev = get(loaded, "/api/events?tail=true&limit=1")["events"][-1]
+    assert ev["type"] == "CLOCK_SET" and ev["payload"] == {"to_min": 905} and ev["ts_sim"] == 905 and ev["actor"] == "sim"
+
+
+# ================================================================================================ weights out of date
+def test_editing_weights_without_a_rerun_marks_the_pending_plan_out_of_date(cancelled):
+    w = get(cancelled, "/api/rules")["weights"]
+    assert get(cancelled, "/api/batches/pending")["weights_out_of_date"] is False
+    cancelled.put("/api/rules", json={"weights": dict(w)})                                 # identical weights: nothing to re-run
+    assert get(cancelled, "/api/batches/pending")["weights_out_of_date"] is False
+    with cancelled.websocket_connect("/ws") as ws:
+        ws.receive_json()
+        cancelled.put("/api/rules", json={"weights": dict(w, senior_60_plus=99)})
+        msgs = drain(ws)
+        assert {"rules", "batch"} <= set(msgs[-1]["topics"])                                # the UI is told to refetch the batch
+        assert get(cancelled, "/api/batches/pending")["weights_out_of_date"] is True
+        ws.send_json({"type": "snapshot"})
+        assert ws.receive_json()["pending_batch"]["weights_out_of_date"] is True
+    assert get(cancelled, "/api/state")["pending_batch"]["weights_out_of_date"] is True
+    cancelled.post("/api/replan", json={"weights": dict(w, senior_60_plus=99)})
+    assert get(cancelled, "/api/batches/pending")["weights_out_of_date"] is False         # re-run with the new weights
+    cancelled.put("/api/rules", json={"weights": dict(w, senior_60_plus=5)})
+    assert get(cancelled, "/api/batches/pending")["weights_out_of_date"] is True
+    cancelled.post("/api/replan", json={})                                                  # a plain re-plan also uses the current weights
+    assert get(cancelled, "/api/batches/pending")["weights_out_of_date"] is False
+    cancelled.put("/api/rules", json={"weights": dict(w, senior_60_plus=6)})
+    cancelled.post(f"/api/batches/{get(cancelled, '/api/batches/pending')['batch_id']}/approve")
+    assert get(cancelled, "/api/batches")[-1]["status"] == "APPROVED"

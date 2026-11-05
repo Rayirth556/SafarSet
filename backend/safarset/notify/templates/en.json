@@ -1,0 +1,46 @@
+{
+  "language": "en",
+  "review_status": "DRAFT: wording to be reviewed by the project owner",
+  "messages": {
+    "NEW": "SafarSet: your new journey is arranged. Take {vehicle}. Board at {boarding}. Departs {depart}; arrives {dest} at {arrive}. Group of {size}. Reason: {reason}.",
+    "CHANGED": "SafarSet: your journey has CHANGED. Take {vehicle}. Board at {boarding}. Departs {depart}; arrives {dest} at {arrive}. Group of {size}. Reason: {reason}.",
+    "DISPLACED_UNPLACED": "SafarSet: your earlier seat is no longer available. We are finding another option and will message you again. Reason: {reason}.",
+    "FALLBACK": "SafarSet: your journey details have been updated. Please check with the control room."
+  },
+  "vehicle": {"TRAIN": "train {train_no} ({name})", "BUS": "bus {name}"},
+  "boarding": {"walk": "{stop} (about {meters} m straight-line {origin_from})", "plain": "{stop}"},
+  "origin": "Chennai Central",
+  "origin_from": "from Chennai Central",
+  "places": {},
+  "reasons": {
+    "decided_by": {
+      "EARLIEST_ARRIVAL": "it is the earliest arrival we could offer",
+      "ONLY_FEASIBLE_OPTION": "it was the only option that fits your group",
+      "CLASS_STEP": "arrivals within 15 minutes count as equal, and this one keeps you closest to your ticket class",
+      "UPGRADE_DISTANCE": "arrivals within 15 minutes count as equal, and this one needs the smaller upgrade",
+      "BEST_FIT": "arrivals within 15 minutes count as equal, and this vehicle fits your group best",
+      "ARRIVAL": "arrivals within 15 minutes count as equal, and this one arrives earlier",
+      "MODE_TIER": "options were equal, so a train was preferred",
+      "DEFAULT": "it was the best option available for your group"
+    },
+    "class_step": {
+      "UPGRADE": "your seat is in a higher class than your ticket",
+      "LOWER_CLASS_FLAGGED": "NOTE: your seat is in a lower class than your ticket",
+      "UNRESERVED_LAST_RESORT": "no reserved seat was free in time, so this is unreserved space"
+    },
+    "earlier_full": "an earlier option was full",
+    "override": "assigned by the control room",
+    "reshuffle_moved": "your vehicle was changed to make room for another passenger; your arrival moves by {delta} min",
+    "reshuffle_made_room": "seats were made available by moving other passengers who lose nothing"
+  },
+  "causes": {
+    "LOAD_REPORT": "the vehicle was too crowded to board",
+    "ROAD_CLOSED": "the road is closed",
+    "TRAIN_CANCELLED": "the train was cancelled",
+    "OPERATOR_OVERRIDE": "the control room changed your journey",
+    "PASSENGER_DISPLACED": "you could not board",
+    "SELF_BOARDED": "you boarded another vehicle",
+    "DEFAULT": "the plan changed"
+  },
+  "change_prefix": "because {cause}"
+}

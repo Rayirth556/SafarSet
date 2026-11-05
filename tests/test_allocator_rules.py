@@ -454,3 +454,21 @@ def test_plan_item_exposes_the_blocking_groups_and_why():
     build_diff(new_db(), p)
     item = next(i for i in p.items if i["kind"] == "UNRESOLVED")["detail"]
     assert item["blocking_why"] == "MOVES_AS_MANY_HEADS_AS_PLACED" and item["blocking_groups"] == ["low1"]
+
+
+def test_movers_must_be_strictly_lower_priority_even_when_a_higher_priority_group_is_the_smaller_mover():
+    """Selection is by smallest head count, but only among strictly lower-priority groups."""
+    vs, free = two_buses(arr_b=155, cap_a=4, cap_b=3)
+    # urgent (size 2, prio 9) needs one more seat on a. The one-head mover `hi1` outranks it (prio 20) and must not move;
+    # the only eligible mover is the two-head `lo2` (prio 2): 2 heads moved to place 2 is refused. Result: unplaced.
+    gs = [grp("hi1", prio=20), grp("lo2", size=2, prio=2), grp("urgent", size=2, prio=9, deadline=152)]
+    pins = {**_pin("hi1", "a:UR", 0, 1), **_pin("lo2", "a:UR", 0, 1)}
+    p = run_pinned(gs, vs, {"a:UR": [4], "b:UR": [3]}, pins)
+    assert not p.reshuffles and placed(p)["hi1"][0] == "a" and "urgent" not in placed(p)
+    stab = {u["group_id"]: u for u in p.unresolved}["urgent"]["reason"]["stability"]
+    assert stab["blocked_by"] == ["lo2"]                                  # hi1 is never even considered
+    # with a one-head lower-priority mover available, that one (and never the higher-priority one) is moved
+    gs = [grp("hi1", prio=20), grp("lo1", prio=1), grp("urgent", size=2, prio=9, deadline=152)]
+    pins = {**_pin("hi1", "a:UR", 0, 1), **_pin("lo1", "a:UR", 0, 1)}
+    p = run_pinned(gs, vs, {"a:UR": [3], "b:UR": [3]}, pins)
+    assert [m["group_id"] for m in p.reshuffles[0]["moves"]] == ["lo1"] and placed(p)["hi1"][0] == "a"

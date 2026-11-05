@@ -133,9 +133,9 @@ async def put_params(request: Request, body: models.SimParamsBody):
 
 @router.post("/clock")
 async def set_clock(request: Request, body: models.ClockBody):
+    """Move the demo clock. Logged as a CLOCK_SET event so replay and restarts see the same clock."""
     st = _st(request)
-    st.engine.clock = body.to_min
-    await st.hub.broadcast({"type": "clock", "clock": views.hhmm(body.to_min), "clock_min": body.to_min})
+    await st.mutate(lambda: st.engine.handle("CLOCK_SET", "sim", {"to_min": body.to_min}, body.to_min))
     return {"clock": views.hhmm(body.to_min), "clock_min": body.to_min}
 
 
@@ -148,40 +148,59 @@ def _compliant(seed, group_id, rate):
 async def depart(request: Request, vehicle_id: str):
     """Close the loop (plan -> observe -> re-plan) for one vehicle at departure, using the compliance and walk-on sliders.
 
-    Confirmed groups that comply board; the rest ignored their allocation and are treated as no-shows (DISPLACED, so they
-    are re-planned). Then the conductor's load report is derived: people already aboard + boarded heads + walk-ons
-    (walk-on rate x nominal). SIMPLIFICATION: the ignorers are not modelled as boarding another vehicle."""
+    1. Ignorers (confirmed groups, deterministic per seed, that do not follow their allocation) board the EARLIEST-departing
+       vehicle toward their destination that has not left yet. When that is this vehicle they RUSH it.
+    2. Rushers and walk-ons (walk-on rate x nominal) are already in the vehicle; allocated passengers then board in priority
+       order while there is physical room. Whoever does not fit is refused at the door.
+    3. The conductor's load report counts everyone present (aboard before + rushers + walk-ons + all allocated heads). When
+       it exceeds the seats the report is OVERCROWDED and the refused groups are DISPLACED and re-planned.
+    Rushers are not lost: they become BOARDED (on this vehicle, no seat recorded) and their old allocation is released."""
     st = _st(request)
-    if st.conn.execute("SELECT 1 FROM vehicles WHERE vehicle_id = ?", (vehicle_id,)).fetchone() is None:
+    row = st.conn.execute("SELECT * FROM vehicles WHERE vehicle_id = ?", (vehicle_id,)).fetchone()
+    if row is None:
         raise HTTPException(404, detail={"error": f"unknown vehicle {vehicle_id}", "kind": "NotFound"})
     seed = st.scenario["meta"]["params"]["seed"]
 
     def fn():
         e, c = st.engine, st.conn
-        boarded, ignored = [], []
-        for a in c.execute("""SELECT a.id, a.group_id, a.size FROM allocations a JOIN pools p USING (pool_id)
-                              WHERE p.vehicle_id = ? AND a.status = 'CONFIRMED' ORDER BY a.id""", (vehicle_id,)).fetchall():
-            if _compliant(seed, a["group_id"], st.sim_params["compliance_rate"]):
+        pool = c.execute("SELECT * FROM pools WHERE vehicle_id = ? AND kind = 'UNRESERVED' ORDER BY pool_id LIMIT 1", (vehicle_id,)).fetchone()
+        mine = c.execute("""SELECT a.id, a.group_id, a.size FROM allocations a JOIN pools p USING (pool_id)
+                            WHERE p.vehicle_id = ? AND a.status = 'CONFIRMED' ORDER BY a.score DESC, a.id""", (vehicle_id,)).fetchall()
+        rushers = []
+        if pool is not None and row["status"] == "SCHEDULED":
+            served = {pl for r in c.execute("SELECT serves_places FROM vehicle_stops WHERE vehicle_id = ? AND seq > 0", (vehicle_id,))
+                      for pl in json.loads(r["serves_places"])}
+            depart_eff = row["depart_min"] + row["delay_min"]
+            for g in c.execute("""SELECT a.group_id, a.size, g.dest_place FROM allocations a JOIN pools p USING (pool_id)
+                                  JOIN vehicles v ON v.vehicle_id = p.vehicle_id JOIN groups g USING (group_id)
+                                  WHERE a.status = 'CONFIRMED' AND p.vehicle_id <> ? AND v.depart_min + v.delay_min >= ?
+                                  ORDER BY a.id""", (vehicle_id, depart_eff)):
+                if g["dest_place"] in served and not _compliant(seed, g["group_id"], st.sim_params["compliance_rate"]):
+                    rushers.append(g)
+        committed = (c.execute("SELECT MAX(committed_other) FROM segment_capacity WHERE pool_id = ?", (pool["pool_id"],)).fetchone()[0] or 0) if pool else 0
+        walk_ons = round(st.sim_params["walkon_rate"] * pool["nominal"]) if pool else 0
+        rush_heads = sum(g["size"] for g in rushers)
+        room = max(0, pool["nominal"] - (committed + rush_heads + walk_ons)) if pool else 10 ** 9
+        boarded, refused = [], []
+        for a in mine:
+            if a["size"] <= room:
                 e.handle("PASSENGER_BOARDED", "field", {"allocation_id": a["id"]}, st.clock)
+                room -= a["size"]
                 boarded.append(a["group_id"])
             else:
-                ignored.append(a)
-        report = None
-        pool = c.execute("SELECT * FROM pools WHERE vehicle_id = ? AND kind = 'UNRESERVED' ORDER BY pool_id LIMIT 1", (vehicle_id,)).fetchone()
+                refused.append(a["group_id"])
+        for g in rushers:
+            e.handle("GROUP_SELF_BOARDED", "field", {"group_id": g["group_id"], "vehicle_id": vehicle_id,
+                                                      "reason": "ignored the plan and boarded the earliest vehicle toward the destination"}, st.clock)
+        report, batch = None, None
         if pool:
-            aboard = c.execute("SELECT COALESCE(SUM(a.size), 0) FROM allocations a WHERE a.pool_id = ? AND a.status = 'BOARDED'", (pool["pool_id"],)).fetchone()[0]
-            committed = c.execute("SELECT MAX(committed_other) FROM segment_capacity WHERE pool_id = ?", (pool["pool_id"],)).fetchone()[0] or 0
-            walkons = round(st.sim_params["walkon_rate"] * pool["nominal"])
-            count = committed + aboard + walkons
-            level = "OVERCROWDED" if count > pool["nominal"] else "FULL" if count == pool["nominal"] else "NORMAL"
-            report = {"pool_id": pool["pool_id"], "level": level, "count": count, "walk_ons": walkons}
-        for a in ignored:
-            e.handle("PASSENGER_DISPLACED", "field", {"allocation_id": a["id"], "reason": "ignored the plan and did not board this vehicle"}, st.clock)
-        batch = None
-        if report:
-            batch = e.handle("LOAD_REPORT", "field", {"vehicle_id": vehicle_id, "pool_id": report["pool_id"], "level": report["level"],
-                                                       "count": report["count"], "reported_by": "SIMULATED conductor ETM (from sliders)"}, st.clock).batch_id
-        return {"vehicle_id": vehicle_id, "boarded_groups": boarded, "ignored_plan_groups": [a["group_id"] for a in ignored],
+            present = committed + rush_heads + walk_ons + sum(a["size"] for a in mine)
+            level = "OVERCROWDED" if present > pool["nominal"] else "FULL" if present == pool["nominal"] else "NORMAL"
+            report = {"pool_id": pool["pool_id"], "level": level, "count": present, "nominal": pool["nominal"], "committed": committed,
+                      "walk_ons": walk_ons, "rushers_heads": rush_heads, "allocated_heads": sum(a["size"] for a in mine)}
+            batch = e.handle("LOAD_REPORT", "field", {"vehicle_id": vehicle_id, "pool_id": pool["pool_id"], "level": level, "count": present,
+                                                       "reported_by": "SIMULATED conductor ETM (from sliders)"}, st.clock).batch_id
+        return {"vehicle_id": vehicle_id, "boarded_groups": boarded, "refused_groups": refused, "rusher_groups": [g["group_id"] for g in rushers],
                 "load_report": report, "batch_id": batch, "params": dict(st.sim_params)}
     return await st.mutate(fn)
 
@@ -201,8 +220,12 @@ async def timeline_next(request: Request):
     if st.timeline_idx >= len(steps):
         raise HTTPException(409, detail={"error": "the scripted timeline is finished; POST /sim/timeline/reset to replay", "kind": "TimelineDone"})
     step = steps[st.timeline_idx]
-    st.engine.clock = step["at_min"]
-    res = await st.mutate(lambda: play_step(st.engine, step))
+
+    def run():
+        if st.engine.clock != step["at_min"]:
+            st.engine.handle("CLOCK_SET", "sim", {"to_min": step["at_min"]}, step["at_min"])
+        return play_step(st.engine, step)
+    res = await st.mutate(run)
     st.timeline_idx += 1
     return {"played": {k: step[k] for k in ("step", "at", "kind", "type")}, "result": _serialise(res), "next_step": st.timeline_idx}
 

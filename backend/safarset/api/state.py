@@ -10,7 +10,7 @@ from ..events.apply import apply_event
 from ..events.reducers import Rejected
 from . import views
 from .hub import Hub
-from .notifier import PlaceholderNotifier
+from ..notify.notifier import Notifier
 
 # which UI data a given event type invalidates (the UIs refetch these topics over REST)
 TOPICS = {
@@ -27,10 +27,12 @@ TOPICS = {
     "BATCH_APPROVED": ["batch", "capacity", "passengers", "unresolved", "kpis", "field"],
     "SMS_SENT": ["phone"],
     "OPERATOR_OVERRIDE": ["capacity", "passengers", "unresolved", "batch", "kpis"],
-    "WEIGHTS_CHANGED": ["rules"],
+    "WEIGHTS_CHANGED": ["rules", "batch"],
     "BUFFER_CHANGED": ["rules", "capacity", "passengers", "batch", "kpis"],
     "SIM_PARAMS_CHANGED": ["sim"],
     "COMMAND_REJECTED": [],
+    "CLOCK_SET": ["sim"],
+    "GROUP_SELF_BOARDED": ["field", "capacity", "passengers", "unresolved", "batch", "kpis"],
 }
 
 
@@ -48,7 +50,7 @@ class AppState:
     def __init__(self, notifier=None):
         self.hub = Hub()
         self.lock = asyncio.Lock()
-        self.notifier = notifier or PlaceholderNotifier()
+        self.notifier = notifier or Notifier.from_env()          # phone mock always; real SMS only if SAFARSET_SMS_* enables it
         self.conn = self.engine = self.scenario = None
         self.sim_params = {}
         self.timeline_idx = 0
@@ -99,12 +101,13 @@ class AppState:
             for t in TOPICS.get(r["type"], []):
                 if t not in topics:
                     topics.append(t)
-            if r["type"] == "SMS_SENT":
+            if r["type"] == "SMS_SENT" and ev["payload"]["channel"] == "PHONE_MOCK":
                 p = ev["payload"]
                 g = self.conn.execute("SELECT pnr FROM groups WHERE group_id = ?", (p["group_id"],)).fetchone()
                 keys = [k for k in (p["group_id"], g["pnr"]) if k]
                 await self.hub.send_phone(keys, {"type": "sms", "seq": ev["seq"], "group_id": p["group_id"], "channel": p["channel"],
-                                                 "lang": p["lang"], "message": p["message"], "reason": p["reason"]})
+                                                 "lang": p["lang"], "message": p["message"], "reason": p["reason"],
+                                                 "detail": p.get("detail")})
         self.last_sent = rows[-1]["seq"]
         if topics:
             await self.hub.broadcast({"type": "kpis", "kpis": views.kpis(self.conn), "clock": views.hhmm(self.clock), "clock_min": self.clock,

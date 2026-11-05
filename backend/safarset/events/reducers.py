@@ -340,8 +340,8 @@ def batch_approved(conn, seq, p):
 def sms_sent(conn, seq, p):
     if _one(conn, "SELECT 1 FROM groups WHERE group_id = ?", (p.group_id,)) is None:
         raise Rejected(f"unknown group {p.group_id}")
-    conn.execute("INSERT INTO notifications (group_id, channel, lang, message, reason, sent_seq) VALUES (?,?,?,?,?,?)",
-                 (p.group_id, p.channel, p.lang, p.message, p.reason, seq))
+    conn.execute("INSERT INTO notifications (group_id, channel, lang, message, reason, status, detail, sent_seq) VALUES (?,?,?,?,?,?,?,?)",
+                 (p.group_id, p.channel, p.lang, p.message, p.reason, p.status, _j(p.detail) if p.detail is not None else None, seq))
 
 
 def operator_override(conn, seq, p):
@@ -406,6 +406,27 @@ def operator_override(conn, seq, p):
                       "old_sms_still_held": bool(live and live["status"] == "CONFIRMED")})))
 
 
+def clock_set(conn, seq, p):
+    _upsert_setting(conn, seq, "clock", {"min": p.to_min})
+
+
+def group_self_boarded(conn, seq, p):
+    g = _one(conn, "SELECT * FROM groups WHERE group_id = ?", (p.group_id,))
+    if g is None or not g["affected"]:
+        raise Rejected(f"group {p.group_id} is unknown or not affected by a disruption")
+    if g["self_boarded_vehicle"]:
+        raise Rejected(f"group {p.group_id} has already boarded {g['self_boarded_vehicle']} on its own")
+    if _one(conn, "SELECT 1 FROM vehicles WHERE vehicle_id = ?", (p.vehicle_id,)) is None:
+        raise Rejected(f"unknown vehicle {p.vehicle_id}")
+    live = _one(conn, "SELECT id, status FROM allocations WHERE group_id = ? AND status IN ('TENTATIVE','CONFIRMED','BOARDED')", (p.group_id,))
+    if live:
+        if live["status"] == "BOARDED":
+            raise Rejected("this group is already boarded on its allocated vehicle")
+        _set_status(conn, seq, live["id"], "RELEASED", {"cause": "SELF_BOARDED", "seq": seq, "vehicle_id": p.vehicle_id, "reason": p.reason})
+    conn.execute("UPDATE groups SET self_boarded_vehicle = ? WHERE group_id = ?", (p.vehicle_id, p.group_id))
+    conn.execute("DELETE FROM group_holds WHERE group_id = ?", (p.group_id,))
+
+
 def _noop(conn, seq, p):
     pass
 
@@ -416,5 +437,6 @@ REDUCERS = {
     "LOAD_REPORT": load_report, "PASSENGER_BOARDED": passenger_boarded, "PASSENGER_DISPLACED": passenger_displaced,
     "PLAN_PROPOSED": plan_proposed, "BATCH_APPROVED": batch_approved, "SMS_SENT": sms_sent,
     "OPERATOR_OVERRIDE": operator_override, "WEIGHTS_CHANGED": weights_changed, "BUFFER_CHANGED": buffer_changed,
-    "SIM_PARAMS_CHANGED": sim_params_changed, "COMMAND_REJECTED": _noop,
+    "SIM_PARAMS_CHANGED": sim_params_changed, "COMMAND_REJECTED": _noop, "CLOCK_SET": clock_set,
+    "GROUP_SELF_BOARDED": group_self_boarded,
 }

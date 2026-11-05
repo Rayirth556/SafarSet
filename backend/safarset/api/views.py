@@ -168,7 +168,8 @@ def passengers(conn, now_min, *, status=None, dest=None, q=None, limit=500, offs
                                "deadline": hhmm(a["deadline_min"])},
                      "language": a.get("language"), "waiting_since": g["waiting_since"],
                      "allocation": _alloc_view(live.get(g["group_id"]), vehicle_of),
-                     "displaced": g["group_id"] in displaced, "held_by_operator": g["group_id"] in held})
+                     "displaced": g["group_id"] in displaced, "held_by_operator": g["group_id"] in held,
+                     "boarded_on_own": g["self_boarded_vehicle"]})
     rows.sort(key=lambda r: (r["rank"] is None, r["rank"] or 0, r["group_id"]))
     return {"total": len(rows), "items": rows[offset:offset + limit]}
 
@@ -202,7 +203,7 @@ def why(conn, now_min, group_id):
             "state": g["state"], "score": s, "rank": rank, "of": len(sc),
             "stored_score_at_allocation": live["score"] if live else None, "allocation": _alloc_view(live, vehicle_of),
             "reason": reason, "decision_text": decision, "unresolved": unresolved, "held_by_operator": held,
-            "displaced": group_id in dstate.load_displaced(conn), "history": history}
+            "displaced": group_id in dstate.load_displaced(conn), "boarded_on_own": g["self_boarded_vehicle"], "history": history}
 
 
 # ------------------------------------------------------------------------------------------------ unresolved demand
@@ -245,6 +246,8 @@ def batch(conn, batch_id, *, with_items=True):
     summary = json.loads(b["summary"])
     out = {"batch_id": b["batch_id"], "status": b["status"], "cause": b["cause"], "base_seq": b["base_seq"], "proposed_seq": b["proposed_seq"],
            "approved_seq": b["approved_seq"], "stale": batch_is_stale(conn, batch_id) if b["status"] == "PROPOSED" else False,
+           # the operator edited the weights after this plan was made and has not re-run: the plan reflects the OLD weights
+           "weights_out_of_date": b["status"] == "PROPOSED" and summary.get("weights") is not None and summary["weights"] != dstate.current_weights(conn),
            "diff": summary.get("diff"), "summary": {k: v for k, v in summary.items() if k not in ("diff", "reshuffle_moves")},
            "reshuffle_moves": summary.get("reshuffle_moves", [])}
     tent = _one(conn, "SELECT COUNT(*) n, COALESCE(SUM(size), 0) h FROM allocations WHERE batch_id = ? AND status = 'TENTATIVE'", batch_id)
@@ -319,8 +322,9 @@ def phone_messages(conn, key):
     if g is None:
         return None
     return {"group_id": g["group_id"], "pnr": g["pnr"],
-            "messages": [{"id": r["id"], "channel": r["channel"], "lang": r["lang"], "message": r["message"], "reason": r["reason"], "sent_seq": r["sent_seq"]}
-                         for r in _all(conn, "SELECT * FROM notifications WHERE group_id = ? ORDER BY id", g["group_id"])]}
+            "messages": [{"id": r["id"], "channel": r["channel"], "lang": r["lang"], "message": r["message"], "reason": r["reason"],
+                          "detail": json.loads(r["detail"]) if r["detail"] else None, "sent_seq": r["sent_seq"]}
+                         for r in _all(conn, "SELECT * FROM notifications WHERE group_id = ? AND channel = 'PHONE_MOCK' ORDER BY id", g["group_id"])]}
 
 
 def pending_batch_summary(conn):
@@ -328,4 +332,5 @@ def pending_batch_summary(conn):
     if not bid:
         return None
     b = batch(conn, bid, with_items=False)
-    return {"batch_id": b["batch_id"], "cause": b["cause"], "stale": b["stale"], "diff": b["diff"], "allocations": b["allocations"]}
+    return {"batch_id": b["batch_id"], "cause": b["cause"], "stale": b["stale"], "weights_out_of_date": b["weights_out_of_date"],
+            "diff": b["diff"], "allocations": b["allocations"]}

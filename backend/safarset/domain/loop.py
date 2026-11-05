@@ -14,7 +14,7 @@ from .planner import propose_plan, submit_plan
 
 # Events after which the set of feasible placements may have changed.
 REPLAN_ON = {"TRAIN_CANCELLED", "TRAIN_DELAYED", "ROAD_CLOSED", "VACANCY_UPDATE", "NOSHOWS_REPORTED", "LOAD_REPORT",
-             "BUFFER_CHANGED", "PASSENGER_DISPLACED", "OPERATOR_OVERRIDE"}
+             "BUFFER_CHANGED", "PASSENGER_DISPLACED", "OPERATOR_OVERRIDE", "GROUP_SELF_BOARDED"}
 
 
 @dataclass
@@ -38,6 +38,15 @@ class Engine:
     def __init__(self, conn, *, notifier=None, scorer=None, config=None, auto_replan=True):
         self.conn, self.notifier, self.scorer, self.config, self.auto_replan = conn, notifier, scorer, config, auto_replan
         self.clock = None
+
+    @classmethod
+    def restore(cls, conn, **kw):
+        """Rebuild an engine around an existing (e.g. replayed) database. Every clock change is logged with an event
+        (CLOCK_SET, or the scenario time on the event it accompanies), so the clock is the scenario time of the last event."""
+        e = cls(conn, **kw)
+        row = conn.execute("SELECT ts_sim FROM events WHERE ts_sim IS NOT NULL ORDER BY seq DESC LIMIT 1").fetchone()
+        e.clock = row["ts_sim"] if row else None
+        return e
 
     # ------------------------------------------------------------------ helpers
     def _now(self, ts_sim):
@@ -101,6 +110,8 @@ class Engine:
         from ..events.reducers import batch_is_stale
         pend = self.pending_batch()
         if pend and not batch_is_stale(self.conn, pend["batch_id"]):
+            if ts_sim is not None and ts_sim != self.clock:          # no event follows, so log the clock move explicitly
+                self.handle("CLOCK_SET", "sim", {"to_min": ts_sim}, ts_sim)
             return pend["batch_id"]
         return self.replan(ts_sim, force=True)
 
@@ -143,8 +154,28 @@ class Engine:
         if alloc_id is not None:
             alloc = dict(self.conn.execute("SELECT * FROM allocations WHERE id = ?", (alloc_id,)).fetchone())
             alloc["reason"] = json.loads(alloc["reason"])
-        msg = self.notifier.notify(g, alloc, kind)
-        if msg:
-            apply_event(self.conn, "SMS_SENT", "system", {"group_id": gid, "channel": msg["channel"], "lang": msg["lang"],
-                                                          "message": msg["message"], "reason": msg.get("reason")}, ts_sim=now)
+        msgs = self.notifier.notify(g, alloc, kind, self._notify_ctx(gid, alloc, kind, now))
+        msgs = [] if not msgs else [msgs] if isinstance(msgs, dict) else list(msgs)
+        for msg in msgs:
+            apply_event(self.conn, "SMS_SENT", "system",
+                        {"group_id": gid, "channel": msg["channel"], "lang": msg["lang"], "message": msg["message"], "reason": msg.get("reason"),
+                         "status": msg.get("status", "SENT"), "detail": msg.get("detail")}, ts_sim=now)
+        if msgs:
             result.notified.append(gid)
+
+    def _notify_ctx(self, gid, alloc, kind, now):
+        """Facts a notifier needs to word the message (names, stop, walk, why the journey changed). No wording here."""
+        c = self.conn
+        places = {r["place_id"]: r["name"] for r in c.execute("SELECT place_id, name FROM places")}
+        g = c.execute("SELECT dest_place FROM groups WHERE group_id = ?", (gid,)).fetchone()
+        ctx = {"now_min": now, "places": places, "dest_name": places.get(g["dest_place"], g["dest_place"])}
+        d = c.execute("SELECT status_reason FROM allocations WHERE group_id = ? AND status = 'DISPLACED' ORDER BY id DESC LIMIT 1", (gid,)).fetchone()
+        if d and d["status_reason"]:
+            ctx["change_cause"] = json.loads(d["status_reason"]).get("cause")
+        if alloc:
+            v = c.execute("SELECT v.* FROM vehicles v JOIN pools p USING (vehicle_id) WHERE p.pool_id = ?", (alloc["pool_id"],)).fetchone()
+            stop = c.execute("SELECT stop_name FROM vehicle_stops WHERE vehicle_id = ? AND seq = ?", (v["vehicle_id"], alloc["board_idx"])).fetchone()
+            boarding = json.loads(v["boarding"])
+            ctx["vehicle"] = {"vehicle_id": v["vehicle_id"], "mode": v["mode"], "name": v["name"], "train_no": v["train_no"], "route_id": v["route_id"]}
+            ctx["boarding"] = {"stop_name": stop["stop_name"], "walk_m": boarding.get("walk_m"), "note": boarding.get("note")}
+        return ctx
