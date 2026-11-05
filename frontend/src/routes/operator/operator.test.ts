@@ -62,6 +62,12 @@ describe('displayNames', () => {
     expect(n.get('BUS-SPL-04')).toBe('MTC 120 R1 · Special 2/2')
     expect(n.get('TRAIN-12607')).toBe('Lalbagh Express')
   })
+  it('does not number transfer-leg services, and does not count them when numbering a special', () => {
+    const leg = (id: string) => ({ vehicle_id: id, name: 'MTC 54', label: '', role: 'TRANSFER_LEG' as const })
+    const n = displayNames([{ vehicle_id: 'BUS-SPL-01', name: 'MTC 54', label: '', role: 'ALLOCATION' as const }, leg('BUS-REG-1'), leg('BUS-REG-2')])
+    expect(n.get('BUS-SPL-01')).toBe('MTC 54')
+    expect(n.get('BUS-REG-1')).toBe('MTC 54')
+  })
   it('numbers non-special duplicates without the word Special, and falls back to the id when unnamed', () => {
     const n = displayNames([v('BUS-REG-1', 'MTC 54'), v('BUS-REG-2', 'MTC 54'), v('X-9', null)])
     expect(n.get('BUS-REG-2')).toBe('MTC 54 · 2/2')
@@ -93,5 +99,17 @@ describe('phone update highlighting', () => {
     expect(isUpdate('DISPLACED_UNPLACED')).toBe(true)
     expect(isUpdate('NEW')).toBe(false)
     expect(isUpdate(null)).toBe(false)
+  })
+})
+
+import { fitScale } from '@/routes/demo/DemoPage'
+
+describe('demo page scale', () => {
+  it('fits the canvas under the header at projector sizes', () => {
+    for (const [w, h] of [[1920, 1080], [1280, 720]]) {
+      const s = fitScale(w, h)
+      expect(s * 2186).toBeLessThanOrEqual(w + 0.001)          // canvas width
+      expect(56 + s * 1144).toBeLessThanOrEqual(h + 0.001)     // header + canvas height
+    }
   })
 })

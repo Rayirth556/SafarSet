@@ -63,6 +63,10 @@ python scripts/dev.py            # open http://localhost:5173  (add --load to lo
 ```
 
 Or by hand: `cd backend && uvicorn safarset.api.app:app` and, in `frontend/`, `npm install && npm run dev`.
+Screens: `/operator` (control room), `/field` (conductor / TTE, phone width), `/phone/:id` (passenger SMS, by PNR or group id; `?bare` hides the picker,
+`?debug` shows message length and SMS segments), `/sim` (demo controls, **not part of the product**), `/demo` (operator, field and phone side by side, scaled to
+the projector). To run the scripted demo: open `/sim`, load a scenario, then press "Next" through the seven steps while `/demo` is on the projector.
+`python scripts/ctrlc_test.py` checks that Ctrl-C stops both servers on Windows.
 Checks: `cd frontend && npm test && npx tsc -b && npm run build`. Design reference images: `frontend/design/` (visual reference only; sample data is outdated).
 
 ### The scripted demo

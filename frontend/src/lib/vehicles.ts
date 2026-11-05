@@ -10,14 +10,16 @@ export const vehicleName = (v: Pick<Vehicle, 'name' | 'label' | 'vehicle_id'>) =
  * two dispatched specials of route "MTC 120 R1" become "MTC 120 R1 · Special 1/2" and "· Special 2/2".
  * Pure, so it is unit-tested.
  */
-export function displayNames(vehicles: Pick<Vehicle, 'name' | 'label' | 'vehicle_id'>[]): Map<string, string> {
+export function displayNames(vehicles: (Pick<Vehicle, 'name' | 'label' | 'vehicle_id'> & { role?: Vehicle['role'] })[]): Map<string, string> {
+  // Only dispatched vehicles are numbered. Regular services used as transfer legs share a route name by the dozen ("MTC 54" x 34 trips),
+  // and a number on those would only be noise (and would wrongly number a special among them).
   const byName = new Map<string, string[]>()
-  for (const v of vehicles) byName.set(vehicleName(v), [...(byName.get(vehicleName(v)) ?? []), v.vehicle_id])
+  for (const v of vehicles) if (v.role !== 'TRANSFER_LEG') byName.set(vehicleName(v), [...(byName.get(vehicleName(v)) ?? []), v.vehicle_id])
   const out = new Map<string, string>()
   for (const v of vehicles) {
     const name = vehicleName(v)
     const ids = [...(byName.get(name) ?? [])].sort()
-    if (ids.length === 1) { out.set(v.vehicle_id, name); continue }
+    if (v.role === 'TRANSFER_LEG' || ids.length === 1) { out.set(v.vehicle_id, name); continue }
     const special = /SPL/i.test(v.vehicle_id)
     out.set(v.vehicle_id, `${name} · ${special ? 'Special ' : ''}${ids.indexOf(v.vehicle_id) + 1}/${ids.length}`)
   }
