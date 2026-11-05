@@ -1,0 +1,10 @@
+data/real/gtfs_raw/
+data/real/gtfs_extracted/
+__pycache__/
+*.db
+*.db-wal
+*.db-shm
+.venv/
+.pytest_cache/
+*.pyc
+data/simulated/scenario_seed*.json

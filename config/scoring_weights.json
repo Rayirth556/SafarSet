@@ -1,0 +1,11 @@
+{
+  "_note": "PLACEHOLDER weights for the STUB scorer (backend/safarset/scoring/stub.py). Operator-editable; changes are logged as WEIGHTS_CHANGED events. The real scorer replaces the stub without touching anything else. See docs/scoring_interface.md.",
+  "weights": {
+    "medical_disability": 40,
+    "senior_60_plus": 25,
+    "child_or_pregnant": 30,
+    "hard_deadline": 20,
+    "reserved_pnr": 10,
+    "ageing_per_hour": 6
+  }
+}

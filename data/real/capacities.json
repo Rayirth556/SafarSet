@@ -1,0 +1,62 @@
+{
+  "_kind": "Mixed. Rail per-coach figures are REAL-ish from SECONDARY sources (blogs, exam-prep sites, Wikipedia mirrors), not official Indian Railways documents. Fields marked ESTIMATE or SIMULATED are not real data.",
+  "_decisions": "Owner decisions (Phase 1 review): one value per class; bus capacity = SEATED only (standing/walk-on slack is handled by the buffer); general coaches use the 70-90 estimate.",
+  "rail_per_coach": {
+    "SL": {
+      "name": "Sleeper",
+      "capacity": 72,
+      "alt_reported": [
+        80
+      ],
+      "source": "secondary",
+      "label": "REAL-secondary"
+    },
+    "3A": {
+      "name": "AC 3-tier",
+      "capacity": 64,
+      "alt_reported": [
+        72
+      ],
+      "source": "secondary",
+      "label": "REAL-secondary",
+      "note": "64 ICF, 72 LHB"
+    },
+    "CC": {
+      "name": "AC Chair Car",
+      "capacity": 78,
+      "alt_reported": [
+        73
+      ],
+      "source": "secondary",
+      "label": "REAL-secondary"
+    },
+    "2S": {
+      "name": "Second Sitting (reserved)",
+      "capacity": 108,
+      "alt_reported": [],
+      "source": "secondary",
+      "label": "REAL-secondary"
+    },
+    "GS": {
+      "name": "General / unreserved",
+      "capacity": 80,
+      "estimate_low": 70,
+      "estimate_high": 90,
+      "source": "rough source estimate (midpoint used)",
+      "label": "ESTIMATE",
+      "note": "No fixed berths. nominal x buffer% applies."
+    }
+  },
+  "bus_nominal_seated": {
+    "MTC_ordinary": {
+      "capacity": 40,
+      "label": "REAL-secondary",
+      "source": "DT Next (2018-era AC-bus report): '40 seats' (secondary; other MTC figures reported 72/80 include standing and are NOT used)"
+    },
+    "INTERCITY_SPECIAL": {
+      "capacity": 50,
+      "label": "SIMULATED",
+      "source": "Owner-approved assumption (no TNSTC/SETC seat count found)"
+    }
+  }
+}

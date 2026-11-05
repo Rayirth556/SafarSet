@@ -1,0 +1,8 @@
+{
+  "_note": "Operator-editable capacity buffers per mode. allocatable = floor(nominal * buffer_pct). PLACEHOLDER defaults chosen for the demo (the brief's example is 75%). Reserved train coaches use exact chart vacancies and have NO buffer.",
+  "buffer_pct": {
+    "MTC_BUS": 0.75,
+    "INTERCITY_BUS": 0.75,
+    "TRAIN_UNRESERVED": 0.70
+  }
+}

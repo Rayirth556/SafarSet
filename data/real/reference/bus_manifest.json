@@ -1,0 +1,58 @@
+{
+  "MTC-22836": {
+    "short_name": "54",
+    "long_name": "Royapuram terminus TO Poonamallee B.T",
+    "serves": "Poonamallee",
+    "n_trips": 91,
+    "n_stops": 46,
+    "end_to_end_minutes": 74.0
+  },
+  "MTC-22798": {
+    "short_name": "101CT",
+    "long_name": "Royapuram TO  Poonamallee Depot",
+    "serves": "Poonamallee",
+    "n_trips": 100,
+    "n_stops": 35,
+    "end_to_end_minutes": 59.0
+  },
+  "MTC-23210": {
+    "short_name": "101 R1",
+    "long_name": "Thiruvotriyur TO Poonamallee",
+    "serves": "Poonamallee",
+    "n_trips": 119,
+    "n_stops": 55,
+    "end_to_end_minutes": 84.0
+  },
+  "MTC-22758": {
+    "short_name": "120 R1",
+    "long_name": "Royapuram TO Avadi",
+    "serves": "Avadi",
+    "n_trips": 44,
+    "n_stops": 50,
+    "end_to_end_minutes": 67.0
+  },
+  "MTC-22244": {
+    "short_name": "150 R1",
+    "long_name": "Royapuram TO Avadi B.T",
+    "serves": "Avadi",
+    "n_trips": 4,
+    "n_stops": 53,
+    "end_to_end_minutes": 73.0
+  },
+  "MTC-22780": {
+    "short_name": "597A R",
+    "long_name": "Poonamallee Terminus TO Thiruvallur Terminal",
+    "serves": "Tiruvallur",
+    "n_trips": 95,
+    "n_stops": 33,
+    "end_to_end_minutes": 43.0
+  },
+  "MTC-23213": {
+    "short_name": "101 CT7",
+    "long_name": "Thiruvottriyur TO  M.G.R.Koyambedu",
+    "serves": "Koyambedu",
+    "n_trips": 19,
+    "n_stops": 40,
+    "end_to_end_minutes": 55.0
+  }
+}

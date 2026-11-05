@@ -1,0 +1,62 @@
+{
+  "_kind": "SIMULATED. These trains are NOT real services. They are modelled on real Chennai Central-origin Arakkonam-line express services. Same schema as data/real/trains.json (simulated=true, verified=false).",
+  "_timing_basis": "Offsets from Chennai Central for PER/AJJ/KPD/JTJ copy the UNVERIFIED Wikipedia 12607 table (PER +15, AJJ +65, KPD +125, JTJ +205 min). AVD (Avadi) and TRL (Tiruvallur) offsets are INTERPOLATION GUESSES (+26, +43). Coach counts are assumptions.",
+  "stations": {
+    "MAS": "MGR Chennai Central", "PER": "Perambur", "AVD": "Avadi (SIMULATED stop)", "TRL": "Tiruvallur (SIMULATED stop)",
+    "AJJ": "Arakkonam Junction", "KPD": "Katpadi Junction", "JTJ": "Jolarpettai Junction"
+  },
+  "trains": [
+    {
+      "train_no": "SIM-CXL", "name": "SIMULATED Cancelled Express", "origin": "MAS", "role": "CANCELLED",
+      "verified": false, "simulated": true,
+      "coaches": {"SL": 6, "3A": 2, "CC": 1, "2S": 3, "GS": 3},
+      "stops": [
+        {"station": "MAS", "arr": null, "dep": "16:00"},
+        {"station": "PER", "arr": "16:14", "dep": "16:15"},
+        {"station": "AVD", "arr": "16:26", "dep": "16:27"},
+        {"station": "TRL", "arr": "16:43", "dep": "16:44"},
+        {"station": "AJJ", "arr": "17:04", "dep": "17:06"},
+        {"station": "KPD", "arr": "18:04", "dep": "18:06"},
+        {"station": "JTJ", "arr": "19:24", "dep": "19:26"}
+      ]
+    },
+    {
+      "train_no": "SIM-ALT-1", "name": "SIMULATED Alternate Express 1", "origin": "MAS", "role": "ALTERNATE",
+      "verified": false, "simulated": true,
+      "coaches": {"SL": 4, "3A": 2, "CC": 1, "2S": 2, "GS": 2},
+      "stops": [
+        {"station": "MAS", "arr": null, "dep": "16:45"},
+        {"station": "PER", "arr": "16:59", "dep": "17:00"},
+        {"station": "AVD", "arr": "17:11", "dep": "17:12"},
+        {"station": "TRL", "arr": "17:28", "dep": "17:29"},
+        {"station": "AJJ", "arr": "17:49", "dep": "17:51"},
+        {"station": "KPD", "arr": "18:49", "dep": "18:51"},
+        {"station": "JTJ", "arr": "20:09", "dep": "20:11"}
+      ]
+    },
+    {
+      "train_no": "SIM-ALT-2", "name": "SIMULATED Alternate Express 2", "origin": "MAS", "role": "ALTERNATE",
+      "verified": false, "simulated": true,
+      "coaches": {"SL": 3, "3A": 1, "2S": 3, "GS": 2},
+      "stops": [
+        {"station": "MAS", "arr": null, "dep": "18:10"},
+        {"station": "PER", "arr": "18:24", "dep": "18:25"},
+        {"station": "AJJ", "arr": "19:14", "dep": "19:16"},
+        {"station": "KPD", "arr": "20:14", "dep": "20:16"},
+        {"station": "JTJ", "arr": "21:34", "dep": "21:36"}
+      ]
+    },
+    {
+      "train_no": "SIM-ALT-3", "name": "SIMULATED Alternate Express 3", "origin": "MAS", "role": "ALTERNATE",
+      "verified": false, "simulated": true,
+      "coaches": {"SL": 4, "CC": 1, "2S": 2, "GS": 3},
+      "stops": [
+        {"station": "MAS", "arr": null, "dep": "19:40"},
+        {"station": "AVD", "arr": "19:52", "dep": "19:53"},
+        {"station": "TRL", "arr": "20:09", "dep": "20:10"},
+        {"station": "AJJ", "arr": "20:30", "dep": "20:32"},
+        {"station": "KPD", "arr": "21:30", "dep": "21:32"}
+      ]
+    }
+  ]
+}

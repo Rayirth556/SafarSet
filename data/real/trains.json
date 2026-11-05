@@ -1,0 +1,62 @@
+{
+  "_status": "DRAFT. 2 trains drafted; NONE verified against an official timetable (NTES/IRCTC). The owner will supply 4-6 verified trains: replace/extend 'trains' and set verified=true per train. Trains with null times are skipped by the scenario generator. Simulated trains live in data/simulated/sim_trains.json (same schema, simulated=true).",
+  "_kind": "REAL (hand-entered from public sources, unverified)",
+  "stations": {
+    "MAS": "MGR Chennai Central",
+    "PER": "Perambur",
+    "AJJ": "Arakkonam Junction",
+    "SHU": "Sholinghur",
+    "WJR": "Walajah Road Junction",
+    "KPD": "Katpadi Junction",
+    "AB": "Ambur",
+    "VN": "Vaniyambadi",
+    "JTJ": "Jolarpettai Junction"
+  },
+  "trains": [
+    {
+      "train_no": "12607",
+      "name": "Lalbagh Express",
+      "origin": "MAS",
+      "runs": "daily (per sources)",
+      "verified": false,
+      "simulated": false,
+      "coaches": {"CC": 2, "2S": 11, "GS": 4},
+      "coaches_verified": false,
+      "timings_source": "Wikipedia 'Lal Bagh Express' stoppage table (single source, retrieved 2026-11-05). Not cross-checked against NTES. A search-engine summary of aggregator sites agreed only on the ~15:30 departure and the stop list.",
+      "stops": [
+        {"station": "MAS", "arr": null,    "dep": "15:30"},
+        {"station": "PER", "arr": "15:43", "dep": "15:45"},
+        {"station": "AJJ", "arr": "16:33", "dep": "16:35"},
+        {"station": "SHU", "arr": "16:53", "dep": "16:55"},
+        {"station": "WJR", "arr": "17:08", "dep": "17:10"},
+        {"station": "KPD", "arr": "17:33", "dep": "17:35"},
+        {"station": "AB",  "arr": "18:13", "dep": "18:15"},
+        {"station": "JTJ", "arr": "18:53", "dep": "18:55"}
+      ],
+      "stops_beyond_scenario_omitted": "Kuppam, Bangarapet, Krishnarajapuram, Bangalore Cantt, KSR Bengaluru (not needed for our destinations)",
+      "coach_composition_note": "Wikipedia lists codes EOG, C1, C2, D1-D11, PC, GEN x4, SLR (20 coaches stated, 21 slots shown). Meaning of C/D codes is NOT defined on the page; by Indian Railways convention C = AC chair car and D = second sitting, but that is unverified. Reserved vs unreserved split per rake must be confirmed."
+    },
+    {
+      "train_no": "12639",
+      "name": "Brindavan Express",
+      "origin": "MAS",
+      "runs": "daily (per sources)",
+      "verified": false,
+      "simulated": false,
+      "timings_source": "Sources CONFLICT. Search summary: MAS dep 07:40 (most sources) or 07:50 (some); Arakkonam 08:33/08:35 (one aggregator) vs 08:48/08:50 (another); Katpadi arr 09:33-09:43. The Wikipedia table is scrambled (up/down directions mixed). Intermediate times therefore left null.",
+      "stops": [
+        {"station": "MAS", "arr": null, "dep": "07:40", "note": "07:50 in some sources"},
+        {"station": "PER", "arr": null, "dep": null},
+        {"station": "AJJ", "arr": null, "dep": null},
+        {"station": "SHU", "arr": null, "dep": null},
+        {"station": "WJR", "arr": null, "dep": null},
+        {"station": "KPD", "arr": null, "dep": null},
+        {"station": "AB",  "arr": null, "dep": null},
+        {"station": "VN",  "arr": null, "dep": null},
+        {"station": "JTJ", "arr": null, "dep": null}
+      ],
+      "coach_composition_note": "Wikipedia says 22 coaches: 3 unreserved second sitting, 13 reserved second sitting, 2 AC chair car, 1 pantry, 1 EOG, 1 LSLRD (adds to 21). Unverified."
+    }
+  ],
+  "needed_from_owner": "Verified timings for 12607 and 12639, plus 2-4 more Chennai Central trains stopping at Arakkonam/Katpadi/Jolarpettai, with coach-class mix per rake."
+}

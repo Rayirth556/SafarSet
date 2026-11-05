@@ -1,0 +1,13 @@
+{
+  "_kind": "REAL: railway station coordinates from OpenStreetMap via Nominatim (ODbL, (c) OpenStreetMap contributors), retrieved 2026-11-05",
+  "stations": {
+    "MAS": {"name": "Chennai Central", "lat": 13.0825901, "lon": 80.2763077, "osm": "node/2486226649"},
+    "PER": {"name": "Perambur", "lat": 13.1082594, "lon": 80.2515158, "osm": "way/217952447", "note": "Nominatim also returned node/3215525982 (13.1080594, 80.2445619); not disambiguated"},
+    "AJJ": {"name": "Arakkonam Junction", "lat": 13.0811750, "lon": 79.6641183, "osm": "node/5273664184", "note": "Southern Railway GTFS has 13.081652, 79.669611 (~0.5 km apart)"},
+    "SHU": {"name": "Sholinghur", "lat": 13.0141131, "lon": 79.4867622, "osm": "node/5310778046"},
+    "WJR": {"name": "Walajah Road Junction", "lat": null, "lon": null, "note": "Nominatim returned Walajah station (way/132476807, 12.9478883, 79.3610578); may be a different station than 'Walajah Road Jn'. Needs checking."},
+    "KPD": {"name": "Katpadi Junction", "lat": null, "lon": null, "note": "Nominatim returned only a bus stand node ('Katpadi Junction - Chittor Bus Stand', node/10980515215, 12.9662552, 79.1374884), not the railway station. Needs checking."},
+    "AB":  {"name": "Ambur", "lat": null, "lon": null, "note": "not looked up"},
+    "JTJ": {"name": "Jolarpettai Junction", "lat": 12.5639905, "lon": 78.5783902, "osm": "node/5311732452"}
+  }
+}

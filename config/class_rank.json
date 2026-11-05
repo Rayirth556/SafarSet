@@ -1,0 +1,4 @@
+{
+  "_note": "Class order for the class rule (same class, then upgrade to a higher class, then lower class (flagged), then unreserved). Lowest first. Operator/owner-editable. Owner-approved order.",
+  "class_rank": ["UR", "2S", "SL", "CC", "3A", "2A", "1A"]
+}

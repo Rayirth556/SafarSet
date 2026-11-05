@@ -1,0 +1,8 @@
+route_id,short_name,long_name,serves_destination,mode,operator,source
+MTC-22836,54,Royapuram terminus TO Poonamallee B.T,Poonamallee,BUS,MTC,REAL:ChennaiGTFS(mdb-3360)
+MTC-22798,101CT,Royapuram TO  Poonamallee Depot,Poonamallee,BUS,MTC,REAL:ChennaiGTFS(mdb-3360)
+MTC-23210,101 R1,Thiruvotriyur TO Poonamallee,Poonamallee,BUS,MTC,REAL:ChennaiGTFS(mdb-3360)
+MTC-22758,120 R1,Royapuram TO Avadi,Avadi,BUS,MTC,REAL:ChennaiGTFS(mdb-3360)
+MTC-22244,150 R1,Royapuram TO Avadi B.T,Avadi,BUS,MTC,REAL:ChennaiGTFS(mdb-3360)
+MTC-22780,597A R,Poonamallee Terminus TO Thiruvallur Terminal,Tiruvallur,BUS,MTC,REAL:ChennaiGTFS(mdb-3360)
+MTC-23213,101 CT7,Thiruvottriyur TO  M.G.R.Koyambedu,Koyambedu,BUS,MTC,REAL:ChennaiGTFS(mdb-3360)

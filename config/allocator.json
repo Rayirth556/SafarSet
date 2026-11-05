@@ -1,0 +1,11 @@
+{
+  "_note": "Allocator parameters. PLACEHOLDER defaults, operator-editable. min_checkin_min is per mode: trains 10 (passengers are already at the origin station; IR prepares its second chart 30-5 min before departure), buses 30 (they must be told and walk to the stop). arrival_tolerance_min: arrivals within this many minutes of the earliest feasible arrival count as equal; it is also the bounded-reshuffle tolerance (+15).",
+  "min_checkin_min": {
+    "TRAIN": 10,
+    "BUS": 30
+  },
+  "walk_m_per_min": 80,
+  "arrival_tolerance_min": 15,
+  "reshuffle_max_moves": 2,
+  "reshuffle_candidates": 8
+}
