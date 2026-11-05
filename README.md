@@ -97,9 +97,18 @@ who ignore their allocation rush the earliest vehicle toward their destination),
 | Scenario shortage | **Tuned** for the demo. It is not a result and says nothing about real Chennai capacity |
 | Tamil SMS text | **DRAFT**, needs a native speaker before any real use |
 
-Provenance, data-quality findings and licences: [data/real/SOURCES.md](data/real/SOURCES.md). Raw GTFS is not committed (git-ignored); the repo holds
-small extracts. Station coordinates come from OpenStreetMap (c) OpenStreetMap contributors, ODbL. Check the licence of the community GTFS feed before
-redistributing anything derived from it.
+Provenance and data-quality findings: [data/real/SOURCES.md](data/real/SOURCES.md). Raw GTFS is not committed (git-ignored); the repo holds
+small extracts. Licences: see [Data & licences](#data--licences).
+
+## Data & licences
+
+The **code** and the **data** in this repository have separate licences.
+
+* **Data.** The bus extracts in `data/real/reference/` are derived from the community feed **UngalSoththu / ChennaiGTFS** and are offered under the
+  **ODbL** with the attribution "UngalSoththu / ChennaiGTFS". Station coordinates are (c) OpenStreetMap contributors, ODbL. The MTC data inside the
+  community feed was scraped with no stated terms, and **MTC's own terms are unverified**. Full statement, caveats and takedown note:
+  [data/real/LICENSE.md](data/real/LICENSE.md). Redistributing these files, or a database derived from them, carries the ODbL attribution and share-alike duties.
+* **Code.** The ODbL above does **not** cover the SafarSet source code. No code licence has been chosen yet, so by default all rights in the code are reserved by its authors.
 
 ## How it works
 
