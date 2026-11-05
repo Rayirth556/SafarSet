@@ -13,3 +13,9 @@ data/simulated/scenario_seed*.json
 frontend/node_modules/
 frontend/dist/
 frontend/*.tsbuildinfo
+
+# secrets and local environment (never commit)
+.env
+.env.*
+*.pem
+*.key
