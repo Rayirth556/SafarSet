@@ -339,14 +339,20 @@ export interface LoadReportBody { level: LoadLevel; count?: number; pool_id?: st
 export interface VacancyBody { pool_id: string; from_seg: number; to_seg: number; vacancy: number }
 
 // ---------------------------------------------------------------------------------------------- phone mock
+export type PhoneKind = 'NEW' | 'CHANGED' | 'DISPLACED_UNPLACED'
 export interface PhoneMessage {
   id: number
   channel: string
   lang: string
   message: string
   reason: string | null
-  detail: { chars?: number; encoding?: string; segments?: number; preferred_language?: string; draft_translation?: boolean } | null
+  detail: { chars?: number; encoding?: string; segments?: number; preferred_language?: string; draft_translation?: boolean; kind?: PhoneKind } | null
   sent_seq: number
+  /** simulation clock when it was sent */
+  sent_at: Hhmm | null
+  sent_at_min: number | null
+  /** null on logs written before the field existed */
+  kind: PhoneKind | null
 }
 export interface PhoneThread { group_id: string; pnr: string | null; messages: PhoneMessage[] }
 

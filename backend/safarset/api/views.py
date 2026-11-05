@@ -327,10 +327,16 @@ def phone_messages(conn, key):
     g = _one(conn, "SELECT group_id, pnr FROM groups WHERE pnr = ? OR group_id = ?", key, key)
     if g is None:
         return None
-    return {"group_id": g["group_id"], "pnr": g["pnr"],
-            "messages": [{"id": r["id"], "channel": r["channel"], "lang": r["lang"], "message": r["message"], "reason": r["reason"],
-                          "detail": json.loads(r["detail"]) if r["detail"] else None, "sent_seq": r["sent_seq"]}
-                         for r in _all(conn, "SELECT * FROM notifications WHERE group_id = ? AND channel = 'PHONE_MOCK' ORDER BY id", g["group_id"])]}
+    rows = _all(conn, "SELECT n.*, e.ts_sim FROM notifications n JOIN events e ON e.seq = n.sent_seq "
+                      "WHERE n.group_id = ? AND n.channel = 'PHONE_MOCK' ORDER BY n.id", g["group_id"])
+    out = []
+    for r in rows:
+        detail = json.loads(r["detail"]) if r["detail"] else None
+        out.append({"id": r["id"], "channel": r["channel"], "lang": r["lang"], "message": r["message"], "reason": r["reason"],
+                    "detail": detail, "sent_seq": r["sent_seq"],
+                    # simulation clock when it was sent, and what kind of message it is (NEW / CHANGED / DISPLACED_UNPLACED; null for old logs)
+                    "sent_at_min": r["ts_sim"], "sent_at": hhmm(r["ts_sim"]), "kind": (detail or {}).get("kind")})
+    return {"group_id": g["group_id"], "pnr": g["pnr"], "messages": out}
 
 
 def pending_batch_summary(conn):

@@ -107,7 +107,8 @@ class AppState:
                 keys = [k for k in (p["group_id"], g["pnr"]) if k]
                 await self.hub.send_phone(keys, {"type": "sms", "seq": ev["seq"], "group_id": p["group_id"], "channel": p["channel"],
                                                  "lang": p["lang"], "message": p["message"], "reason": p["reason"],
-                                                 "detail": p.get("detail")})
+                                                 "detail": p.get("detail"), "kind": (p.get("detail") or {}).get("kind"),
+                                                 "sent_at_min": ev["ts_sim"], "sent_at": views.hhmm(ev["ts_sim"])})
         self.last_sent = rows[-1]["seq"]
         if topics:
             await self.hub.broadcast({"type": "kpis", "kpis": views.kpis(self.conn), "clock": views.hhmm(self.clock), "clock_min": self.clock,
@@ -122,6 +123,9 @@ class AppState:
                 result = fn()
             except Rejected as e:
                 await self.publish()
-                raise HTTPException(409, detail={"error": str(e), "kind": type(e).__name__}) from e
+                body = {"error": str(e), "kind": type(e).__name__}
+                if getattr(e, "detail", None):
+                    body["detail"] = e.detail            # e.g. "blocked by database capacity constraint"
+                raise HTTPException(409, detail=body) from e
             await self.publish()
             return result

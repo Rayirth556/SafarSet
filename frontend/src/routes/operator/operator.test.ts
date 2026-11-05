@@ -84,3 +84,14 @@ describe('phone language badge', () => {
     expect(showLangBadge(false, 'en')).toBe(true)
   })
 })
+
+import { isUpdate } from '@/routes/phone/PhonePage'
+
+describe('phone update highlighting', () => {
+  it('highlights messages that change an earlier plan, not new ones or old logs without a kind', () => {
+    expect(isUpdate('CHANGED')).toBe(true)
+    expect(isUpdate('DISPLACED_UNPLACED')).toBe(true)
+    expect(isUpdate('NEW')).toBe(false)
+    expect(isUpdate(null)).toBe(false)
+  })
+})

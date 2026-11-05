@@ -2,6 +2,7 @@
 name = "safarset"
 version = "0.0.1"
 requires-python = ">=3.12"
+license = "MIT"
 
 [tool.pytest.ini_options]
 pythonpath = ["backend"]

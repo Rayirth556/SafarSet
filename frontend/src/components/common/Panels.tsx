@@ -22,7 +22,13 @@ export function Eyebrow({ children, className }: { children: ReactNode; classNam
 
 export function ErrorNote({ error }: { error: Error | null | undefined }) {
   if (!error) return null
-  return <p role="alert" className="rounded-md bg-unresolved/10 px-3 py-2 text-sm text-unresolved-ink">{error.message}</p>
+  const detail = (error as { detail?: string }).detail
+  return (
+    <div role="alert" className="rounded-md bg-unresolved/10 px-3 py-2 text-sm text-unresolved-ink">
+      <p>{error.message}</p>
+      {detail && <p className="mt-0.5 text-sm font-semibold uppercase tracking-wide">{detail}</p>}
+    </div>
+  )
 }
 
 export function Loading({ what }: { what: string }) {

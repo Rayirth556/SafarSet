@@ -111,8 +111,9 @@ def test_overselling_plan_is_rejected_by_the_database_with_no_partial_state(canc
     gs = groups_for(cancelled, "AVADI")                         # more heads than the bus's 30 buffered seats
     assert sum(one(cancelled, "SELECT size FROM groups WHERE group_id = ?", g) for g in gs) > 30
     before = (state_dump(cancelled), one(cancelled, "SELECT COUNT(*) FROM events"))
-    with pytest.raises(Rejected, match="database rejected"):
+    with pytest.raises(Rejected, match=r"No room on .*: .* to .* free seats? and this group needs") as refused:
         plan(cancelled, "BIG", BUS_POOL, BUS, "AVADI", gs)
+    assert refused.value.detail == "blocked by database capacity constraint" and "CHECK constraint" not in str(refused.value)
     after = state_dump(cancelled)
     assert after["allocations"] == before[0]["allocations"] and after["segment_capacity"] == before[0]["segment_capacity"]
     assert after["plan_batches"] == []

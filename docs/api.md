@@ -4,8 +4,11 @@ Run: `cd backend && uvicorn safarset.api.app:app --reload` (port 8000). Interact
 Everything in the demo is SIMULATED unless a field says REAL. Times are minutes of day (`*_min`) with an `HH:MM` twin.
 
 **Errors** always look like `{"detail": {"error": "<human message>", "kind": "<Kind>"}}`:
-`409` refused by a rule (kinds `Rejected`, `StaleBatch`, `BufferRejected`, `NoScenario`, `TimelineDone`), `422` bad request
+`409` refused by a rule (kinds `Rejected`, `StaleBatch`, `BufferRejected`, `CapacityRejected`, `NoScenario`, `TimelineDone`), `422` bad request
 (`InvalidRequest` with a `fields` list, `InvalidScenario`, `InvalidWeights`), `404` unknown id (`NotFound`).
+
+A `CapacityRejected` error says which vehicle, coach and segment is full in plain language (`No room on MTC 120 R1 (BUS-SPL-02), UR: A to B has 0 free seats and this group needs 1.`)
+and adds `"detail": "blocked by database capacity constraint"` (the database, not just the planner, refused it).
 
 Nothing is ever sent to a passenger until a batch is approved (`POST /api/batches/{id}/approve`).
 
@@ -46,6 +49,7 @@ A FULL/OVERCROWDED report displaces confirmed groups that have no physical room 
 ## 3. Passenger phone mock
 `GET /api/phone/{pnr_or_group_id}/messages`; live stream `WS /ws/phone/{pnr_or_group_id}`:
 first `{"type":"history","found":bool,"messages":[...]}`, then `{"type":"sms","group_id","channel","lang","message","reason"}`.
+Each message also has `kind` (`NEW`, `CHANGED`, `DISPLACED_UNPLACED`; null on logs written before this field existed) and `sent_at` / `sent_at_min` (the simulation clock when it was sent); the `sms` push carries the same fields.
 Each message names the vehicle, where to board, the times, the destination, the group size and the **reason**, in the group's language
 (`en` / `ta`; the Tamil is a draft that needs native review). Samples: `docs/messages.md`. `detail` has `chars`, `encoding`, `segments`.
 The phone mock shows only `PHONE_MOCK` messages; real SMS (optional, behind a flag) is a separate `SMS_HTTP` record.

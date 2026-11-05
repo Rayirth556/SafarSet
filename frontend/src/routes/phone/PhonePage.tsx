@@ -7,6 +7,7 @@ import { ErrorNote, Loading, NoScenario } from '@/components/common/Panels'
 import { useLoaded, useNotifier, usePassengers, usePhoneThread } from '@/hooks/queries'
 import { useAppState } from '@/hooks/useAppState'
 import { pnrTail } from '@/lib/format'
+import { cn } from '@/lib/utils'
 import { usePhoneSocket } from './usePhoneSocket'
 
 /** Show a language badge unless the phone mock is English-only and the message is English (then there is nothing to choose between). */
@@ -14,17 +15,28 @@ export const showLangBadge = (englishOnly: boolean, lang: string) => !(englishOn
 
 const LANG: Record<string, string> = { en: 'English', ta: 'தமிழ்' }
 
-function Bubble({ m, englishOnly }: { m: PhoneMessage; englishOnly: boolean }) {
+/** A message that changes an earlier plan (a new seat, or a seat lost) is highlighted as an update. */
+export const isUpdate = (kind: PhoneMessage['kind']) => kind === 'CHANGED' || kind === 'DISPLACED_UNPLACED'
+
+function Bubble({ m, englishOnly, debug, showTime }: { m: PhoneMessage; englishOnly: boolean; debug: boolean; showTime: boolean }) {
   const d = m.detail
+  const update = isUpdate(m.kind)
   return (
-    <li className="max-w-[88%] self-start">
-      <div className="rounded-2xl rounded-bl-md border bg-card px-4 py-3 text-base leading-snug shadow-sm" lang={m.lang} data-testid="sms">
+    <li className="flex max-w-[88%] flex-col self-start">
+      {showTime && m.sent_at && <div className="mb-2 self-center font-mono text-[13px] text-ink-2">{m.sent_at}</div>}
+      <div
+        className={cn('rounded-2xl rounded-bl-md border px-4 py-3 text-base leading-snug shadow-sm', update ? 'border-tentative-ink/40 bg-tentative/10' : 'bg-card')}
+        lang={m.lang}
+        data-testid="sms"
+        data-kind={m.kind ?? ''}
+      >
+        {update && <div className="mb-1 text-sm font-bold uppercase tracking-wide text-tentative-ink">Update</div>}
         {m.message}
       </div>
       <div className="mt-1 flex flex-wrap items-center gap-x-2 px-1 text-[13px] text-ink-2">
         {showLangBadge(englishOnly, m.lang) && <span className="rounded bg-secondary px-1.5 py-0.5 font-medium">{LANG[m.lang] ?? m.lang}</span>}
         {d?.draft_translation && <span className="text-tentative-ink">Draft translation, needs native review</span>}
-        {d?.chars != null && <span className="font-mono">{d.chars} chars{d.segments != null && ` · ${d.segments} SMS`}</span>}
+        {debug && d?.chars != null && <span className="font-mono">{d.chars} chars{d.segments != null && ` · ${d.segments} SMS`}</span>}
       </div>
     </li>
   )
@@ -40,6 +52,7 @@ function Thread({ id }: { id: string }) {
     end.current?.scrollIntoView({ block: 'end' })      // no return value: some browsers return a Promise, which React rejects from an effect
   }, [count])
   const englishOnly = notifier?.phone_mock_english_only ?? false
+  const debug = useSearchParams()[0].has('debug')                  // message length and SMS segment counts are for developers only
 
   return (
     <div className="flex h-[640px] w-[360px] max-w-full flex-col overflow-hidden rounded-[2.2rem] border-[10px] border-ink bg-page shadow-xl" data-testid="phone">
@@ -59,7 +72,7 @@ function Thread({ id }: { id: string }) {
           <p className="mt-10 text-center text-base text-ink-2" data-testid="empty-thread">No messages yet. Messages arrive here once the operator approves a plan.</p>
         )}
         <ul className="flex flex-col gap-3">
-          {data?.messages.map((m) => <Bubble key={m.id} m={m} englishOnly={englishOnly} />)}
+          {data?.messages.map((m, i) => <Bubble key={m.id} m={m} englishOnly={englishOnly} debug={debug} showTime={m.sent_at !== data.messages[i - 1]?.sent_at} />)}
         </ul>
         <div ref={end} />
       </div>

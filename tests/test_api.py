@@ -504,3 +504,50 @@ def test_editing_weights_without_a_rerun_marks_the_pending_plan_out_of_date(canc
     cancelled.put("/api/rules", json={"weights": dict(w, senior_60_plus=6)})
     cancelled.post(f"/api/batches/{get(cancelled, '/api/batches/pending')['batch_id']}/approve")
     assert get(cancelled, "/api/batches")[-1]["status"] == "APPROVED"
+
+
+# ================================================================================================ capacity refusals and phone message metadata
+def test_assign_into_a_full_pool_gets_a_plain_message_and_the_constraint_detail(approved):
+    full = next(v for v in get(approved, "/api/capacity") if v["vehicle_id"] == "BUS-SPL-02")
+    pool = next(p for p in full["pools"] if p["kind"] == "UNRESERVED")
+    assert min(s["free"] for s in pool["segments"]) == 0                      # the tuned shortage: this bus is full
+    unresolved = next(d for d in get(approved, "/api/unresolved") if d["dest_place"] == "AVADI")["items"][0]
+    r = approved.post(f"/api/groups/{unresolved['group_id']}/override",
+                      json={"action": "ASSIGN", "reason": "force it", "pool_id": pool["pool_id"], "board_idx": 0, "alight_idx": len(full["stops"]) - 1})
+    d = error(r, 409, "CapacityRejected")
+    assert d["detail"] == "blocked by database capacity constraint"
+    assert "No room on" in d["error"] and "BUS-SPL-02" in d["error"] and "free seat" in d["error"] and "needs" in d["error"]
+    assert "CHECK constraint" not in d["error"] and "database rejected" not in d["error"]
+    after = next(v for v in get(approved, "/api/capacity") if v["vehicle_id"] == "BUS-SPL-02")
+    assert after["pools"] == full["pools"]                                   # the refusal changed nothing
+
+
+def test_phone_messages_carry_the_sim_time_and_the_kind(approved):
+    assert get(approved, "/api/batches/pending") is None                      # B1 was approved by the fixture
+    groups = [g for g in get(approved, "/api/passengers?status=CONFIRMED&limit=500")["items"] if g["pnr"]]
+    msgs = get(approved, f"/api/phone/{groups[0]['pnr']}/messages")["messages"]
+    assert msgs and all(m["kind"] == "NEW" and m["sent_at"] and m["sent_at_min"] is not None for m in msgs)
+    assert msgs[0]["sent_at"] == f"{msgs[0]['sent_at_min'] // 60:02d}:{msgs[0]['sent_at_min'] % 60:02d}"
+    # a bus is reported overcrowded: displaced groups get CHANGED (new seat) or DISPLACED_UNPLACED (no seat yet) after the re-plan is approved
+    approved.post("/sim/inject-overcrowd")
+    pending = get(approved, "/api/batches/pending")
+    approved.post(f"/api/batches/{pending['batch_id']}/approve")
+    kinds = set()
+    for item in pending["items"].get("DISPLACED", []):
+        thread = get(approved, f"/api/phone/{item['pnr'] or item['group_id']}/messages")["messages"]
+        kinds.add(thread[-1]["kind"])
+        assert thread[-1]["kind"] == ("CHANGED" if item["detail"]["replaced"] else "DISPLACED_UNPLACED")
+    assert kinds == {"CHANGED", "DISPLACED_UNPLACED"}
+
+
+def test_phone_websocket_push_has_kind_and_time(approved):
+    g = next(g for g in get(approved, "/api/passengers?status=CONFIRMED&limit=500")["items"] if g["allocation"]["vehicle_id"] == "BUS-SPL-02")
+    approved.post("/sim/inject-overcrowd")
+    pending = get(approved, "/api/batches/pending")
+    moved = next(i for i in pending["items"]["DISPLACED"] if i["detail"]["replaced"])
+    with approved.websocket_connect(f"/ws/phone/{moved['group_id']}") as ws:
+        history = ws.receive_json()
+        assert history["type"] == "history" and all("kind" in m and "sent_at" in m for m in history["messages"])
+        approved.post(f"/api/batches/{pending['batch_id']}/approve")
+        sms = ws.receive_json()
+        assert sms["type"] == "sms" and sms["kind"] == "CHANGED" and len(sms["sent_at"]) == 5

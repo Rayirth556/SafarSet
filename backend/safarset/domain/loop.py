@@ -159,7 +159,7 @@ class Engine:
         for msg in msgs:
             apply_event(self.conn, "SMS_SENT", "system",
                         {"group_id": gid, "channel": msg["channel"], "lang": msg["lang"], "message": msg["message"], "reason": msg.get("reason"),
-                         "status": msg.get("status", "SENT"), "detail": msg.get("detail")}, ts_sim=now)
+                         "status": msg.get("status", "SENT"), "detail": {**(msg.get("detail") or {}), "kind": kind}}, ts_sim=now)
         if msgs:
             result.notified.append(gid)
 

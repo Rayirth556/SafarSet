@@ -6,13 +6,16 @@ export class ApiError extends Error {
   /** backend kind (Rejected, StaleBatch, BufferRejected, NoScenario, InvalidRequest, NotFound, ...) or 'Unavailable' when the server cannot be reached */
   readonly kind: string
   readonly fields: FieldError[]
+  /** extra explanation from the server, e.g. "blocked by database capacity constraint" on a CapacityRejected */
+  readonly detail: string | undefined
 
-  constructor(status: number, kind: string, message: string, fields: FieldError[] = []) {
+  constructor(status: number, kind: string, message: string, fields: FieldError[] = [], detail?: string) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.kind = kind
     this.fields = fields
+    this.detail = detail
   }
 }
 
@@ -31,8 +34,8 @@ export async function request<T>(method: string, path: string, body?: unknown): 
   let json: unknown
   try { json = text ? JSON.parse(text) : undefined } catch { json = undefined }
   if (!res.ok) {
-    const detail = (json as { detail?: { error?: string; kind?: string; fields?: FieldError[] } } | undefined)?.detail
-    if (detail?.error) throw new ApiError(res.status, detail.kind ?? 'Error', detail.error, detail.fields)
+    const detail = (json as { detail?: { error?: string; kind?: string; fields?: FieldError[]; detail?: string } } | undefined)?.detail
+    if (detail?.error) throw new ApiError(res.status, detail.kind ?? 'Error', detail.error, detail.fields, detail.detail)
     // a dev proxy with no backend behind it answers 5xx with plain text
     if (res.status >= 500) throw new ApiError(res.status, 'Unavailable', 'The SafarSet server is not responding. Is the backend running?')
     throw new ApiError(res.status, 'Error', `Request failed (${res.status})`)

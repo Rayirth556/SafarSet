@@ -307,7 +307,7 @@ def test_assign_into_a_full_pool_is_refused_by_the_database(started):
     e, c, _ = started
     j = dest_stop(c, "BUS-SPL-02", "AVADI")
     pool = "BUS-SPL-02:UR"
-    with pytest.raises(Rejected, match="database rejected"):
+    with pytest.raises(Rejected, match=r"No room on .*BUS-SPL-02.*UR: .* to .* has \d+ free seats? and this group needs \d+") as refused:
         for g in [r["group_id"] for r in rows(c, "SELECT group_id FROM groups WHERE dest_place = 'AVADI' ORDER BY group_id")] * 1:
             e.override(g, "ASSIGN", "force everyone onto one bus", pool_id=pool, board_idx=0, alight_idx=j, ts_sim=850)
     assert max(r["used"] - r["cap"] for r in rows(c, "SELECT used, cap FROM segment_capacity")) <= 0

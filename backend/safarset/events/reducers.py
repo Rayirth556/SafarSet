@@ -5,6 +5,7 @@ Rejections raise Rejected; the transaction rolls back and nothing (neither event
 """
 import json
 import math
+import sqlite3
 
 from ..db.loader import load_scenario
 
@@ -21,6 +22,44 @@ class StaleBatch(Rejected):
 
 class BufferRejected(Rejected):
     pass
+
+
+class CapacityRejected(Rejected):
+    """An allocation would oversell a segment. The message names the pool and segment; `detail` says the database constraint stopped it."""
+    detail = "blocked by database capacity constraint"
+
+
+def _capacity_refusal(conn, pool_id, board_idx, alight_idx, size):
+    """Plain-language reason for a refused allocation: which vehicle, coach and segment is full. Called after the failed statement
+    (SQLite undoes that statement only), so the segment numbers are the ones that refused it."""
+    pool = _one(conn, "SELECT p.class, v.vehicle_id, v.name FROM pools p JOIN vehicles v USING (vehicle_id) WHERE p.pool_id = ?", (pool_id,))
+    stops = {r["seq"]: (r["stop_name"] or r["stop_id"]) for r in conn.execute(
+        "SELECT seq, stop_name, stop_id FROM vehicle_stops WHERE vehicle_id = ?", (pool["vehicle_id"],))}
+    full = [r for r in conn.execute("SELECT seg_idx, cap - used AS free FROM segment_capacity WHERE pool_id = ? AND seg_idx >= ? AND seg_idx < ? "
+                                    "AND cap - used < ? ORDER BY seg_idx", (pool_id, board_idx, alight_idx, size))]
+    who = f"{pool['name'] or pool['vehicle_id']} ({pool['vehicle_id']}), {pool['class']}"
+    if not full:
+        return CapacityRejected(f"No room on {who}: the seats for stops {board_idx} to {alight_idx} are not available.")
+    first = full[0]
+    free = max(0, first["free"])
+    text = (f"No room on {who}: {stops.get(first['seg_idx'], first['seg_idx'])} to {stops.get(first['seg_idx'] + 1, first['seg_idx'] + 1)} "
+            f"has {free} free seat{'' if free == 1 else 's'} and this group needs {size}.")
+    if len(full) > 1:
+        text += f" {len(full)} segments of the journey are full."
+    return CapacityRejected(text)
+
+
+def _insert_allocation(conn, sql, args, pool_id, board_idx, alight_idx, size):
+    try:
+        conn.execute(sql, args)
+    except sqlite3.IntegrityError as e:
+        if "used <= cap" in str(e):
+            raise _capacity_refusal(conn, pool_id, board_idx, alight_idx, size) from e
+        raise
+
+
+def g_size(conn, group_id):
+    return _one(conn, "SELECT size FROM groups WHERE group_id = ?", (group_id,))["size"]
 
 
 def _j(x):
@@ -303,9 +342,10 @@ def plan_proposed(conn, seq, p):
         g = _one(conn, "SELECT affected FROM groups WHERE group_id = ?", (a.group_id,))
         if g is None or not g["affected"]:
             raise Rejected(f"group {a.group_id} is unknown or not affected by a disruption")
-        conn.execute("INSERT INTO allocations (group_id, pool_id, board_idx, alight_idx, size, status, batch_id, score, reason,"
-                     " created_seq, status_seq) VALUES (?,?,?,?,(SELECT size FROM groups WHERE group_id = ?),'TENTATIVE',?,?,?,?,?)",
-                     (a.group_id, a.pool_id, a.board_idx, a.alight_idx, a.group_id, p.batch_id, a.score, _j(a.reason), seq, seq))
+        _insert_allocation(conn, "INSERT INTO allocations (group_id, pool_id, board_idx, alight_idx, size, status, batch_id, score, reason,"
+                           " created_seq, status_seq) VALUES (?,?,?,?,(SELECT size FROM groups WHERE group_id = ?),'TENTATIVE',?,?,?,?,?)",
+                           (a.group_id, a.pool_id, a.board_idx, a.alight_idx, a.group_id, p.batch_id, a.score, _j(a.reason), seq, seq),
+                           a.pool_id, a.board_idx, a.alight_idx, g_size(conn, a.group_id))
         footprint[(a.pool_id, a.board_idx, a.alight_idx)] = 1
     for (pool_id, lo, hi) in sorted(footprint):
         conn.execute("INSERT INTO batch_footprint VALUES (?,?,?,?)", (p.batch_id, pool_id, lo, hi))
@@ -395,9 +435,10 @@ def operator_override(conn, seq, p):
                          "alight_idx": p.alight_idx, "depart_min": stops[p.board_idx]["dep_min"] + veh["delay_min"], "arrive_min": arrive,
                          "class_step": "OPERATOR_ASSIGNED", "class_flagged": False},
               "text": f"Assigned by the operator: {p.reason}." + (" Warnings: " + "; ".join(warnings) + "." if warnings else "")}
-    conn.execute("INSERT INTO allocations (group_id, pool_id, board_idx, alight_idx, size, status, batch_id, score, reason, created_seq, status_seq)"
-                 " VALUES (?,?,?,?,?,'TENTATIVE',?,?,?,?,?)",
-                 (p.group_id, p.pool_id, p.board_idx, p.alight_idx, g["size"], bid, 1e6, _j(reason), seq, seq))
+    _insert_allocation(conn, "INSERT INTO allocations (group_id, pool_id, board_idx, alight_idx, size, status, batch_id, score, reason, created_seq, status_seq)"
+                       " VALUES (?,?,?,?,?,'TENTATIVE',?,?,?,?,?)",
+                       (p.group_id, p.pool_id, p.board_idx, p.alight_idx, g["size"], bid, 1e6, _j(reason), seq, seq),
+                       p.pool_id, p.board_idx, p.alight_idx, g["size"])
     conn.execute("INSERT INTO batch_footprint VALUES (?,?,?,?)", (bid, p.pool_id, p.board_idx, p.alight_idx))
     idx = _one(conn, "SELECT COALESCE(MAX(item_idx), -1) + 1 AS n FROM batch_items WHERE batch_id = ?", (bid,))["n"]
     conn.execute("INSERT INTO batch_items VALUES (?,?,?,?,?)",

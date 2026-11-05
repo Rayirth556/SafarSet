@@ -108,7 +108,7 @@ The **code** and the **data** in this repository have separate licences.
   **ODbL** with the attribution "UngalSoththu / ChennaiGTFS". Station coordinates are (c) OpenStreetMap contributors, ODbL. The MTC data inside the
   community feed was scraped with no stated terms, and **MTC's own terms are unverified**. Full statement, caveats and takedown note:
   [data/real/LICENSE.md](data/real/LICENSE.md). Redistributing these files, or a database derived from them, carries the ODbL attribution and share-alike duties.
-* **Code.** The ODbL above does **not** cover the SafarSet source code. No code licence has been chosen yet, so by default all rights in the code are reserved by its authors.
+* **Code.** The SafarSet source code is under the **MIT licence** ([LICENSE](LICENSE)). The ODbL above does **not** apply to the code, and the MIT licence does **not** apply to the data under `data/`.
 
 ## How it works
 
