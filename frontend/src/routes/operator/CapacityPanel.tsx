@@ -2,7 +2,7 @@ import type { Pool, Segment, Vehicle } from '@/api/types'
 import { Card, ErrorNote, Loading } from '@/components/common/Panels'
 import { Pill } from '@/components/common/StatusChip'
 import { useCapacity } from '@/hooks/queries'
-import { vehicleName } from '@/lib/vehicles'
+import { nameOf, useVehicleIndex } from '@/lib/vehicles'
 import { cn } from '@/lib/utils'
 
 /** Shares of a segment, as percentages of its capacity. They are scaled down if they ever summed past the capacity, so a bar cannot exceed 100%. */
@@ -80,12 +80,13 @@ function PoolBlock({ pool }: { pool: Pool }) {
 }
 
 function VehicleCard({ v }: { v: Vehicle }) {
+  const names = useVehicleIndex()
   const ended = v.status !== 'SCHEDULED'
   const ends = v.stops.length > 1 ? `${v.stops[0]} → ${v.stops.at(-1)}` : v.stops[0]
   return (
     <div className={cn('rounded-lg border bg-page px-4 py-3', ended && 'opacity-60')} data-testid={`vehicle-${v.vehicle_id}`}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-lg font-semibold">{vehicleName(v)}</span>
+        <span className="text-lg font-semibold">{nameOf(names, v.vehicle_id)}</span>
         <Pill>{v.mode === 'TRAIN' ? 'Train' : v.mode === 'BUS' ? 'Bus' : v.mode}</Pill>
         {ended && <Pill tone="bad" className="uppercase">{v.status}</Pill>}
         {v.delay_min > 0 && <Pill tone="warn">+{v.delay_min} min</Pill>}

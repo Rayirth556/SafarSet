@@ -29,3 +29,11 @@ export const useEvents = (hideRejected: boolean) =>
     enabled: useLoaded(),
     placeholderData: (prev) => prev,
   })
+
+// ------------------------------------------------------------------ field view and phone mock
+export const useFieldVehicles = () => useQuery({ queryKey: [...qk.field, 'vehicles'], queryFn: api.fetchFieldVehicles, enabled: useLoaded() })
+export const useManifest = (vehicleId: string | null) =>
+  useQuery({ queryKey: [...qk.field, 'manifest', vehicleId], queryFn: () => api.fetchManifest(vehicleId!), enabled: useLoaded() && vehicleId !== null })
+export const useNotifier = () => useQuery({ queryKey: qk.notifier, queryFn: api.fetchNotifier, enabled: useLoaded() })
+export const usePhoneThread = (key: string) =>
+  useQuery({ queryKey: [...qk.phone, key], queryFn: () => api.fetchPhoneMessages(key), enabled: useLoaded() })

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { useCapacity } from '@/hooks/queries'
-import { vehicleName } from '@/lib/vehicles'
+import { nameOf, useVehicleIndex } from '@/lib/vehicles'
 
 const ACTIONS: { value: OverrideAction; label: string; help: string }[] = [
   { value: 'ASSIGN', label: 'Assign to a vehicle', help: 'Put this group on a chosen vehicle and journey.' },
@@ -20,6 +20,7 @@ const select = 'h-10 w-full rounded-lg border bg-card px-3 text-base'
 export function OverrideDialog({ why, open, onClose }: { why: Why; open: boolean; onClose: () => void }) {
   const qc = useQueryClient()
   const { data: vehicles } = useCapacity('ALLOCATION')
+  const names = useVehicleIndex()
   const [action, setAction] = useState<OverrideAction>('ASSIGN')
   const [reason, setReason] = useState('')
   const [vehicleId, setVehicleId] = useState('')
@@ -70,7 +71,7 @@ export function OverrideDialog({ why, open, onClose }: { why: Why; open: boolean
               <span className="mb-1 block font-medium">Vehicle</span>
               <select className={select} value={vehicleId} onChange={(e) => { setVehicleId(e.target.value); setPoolId(''); setBoard('0'); setAlight('') }}>
                 <option value="">Choose…</option>
-                {usable.map((v) => <option key={v.vehicle_id} value={v.vehicle_id}>{vehicleName(v)} · {v.vehicle_id} · dep {v.depart}</option>)}
+                {usable.map((v) => <option key={v.vehicle_id} value={v.vehicle_id}>{nameOf(names, v.vehicle_id)} · {v.vehicle_id} · dep {v.depart}</option>)}
               </select>
             </label>
             <label className="block sm:col-span-2">

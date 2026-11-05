@@ -49,4 +49,7 @@ export const BLOCKING_WHY: Record<string, string> = {
   MOVES_AS_MANY_HEADS_AS_PLACED: 'moving the blocking group would displace as many people as it would place',
 }
 
+/** Weights as [key, points] pairs, highest points first (ties keep the server's order). */
+export const byPoints = <T extends number>(w: Record<string, T>): [string, T][] => Object.entries(w).sort((a, b) => b[1] - a[1])
+
 export const fmtPoints = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1))

@@ -6,7 +6,7 @@ import { Card, ErrorNote, Eyebrow, Loading } from '@/components/common/Panels'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useRules } from '@/hooks/queries'
-import { factorLabel } from '@/lib/labels'
+import { byPoints, factorLabel } from '@/lib/labels'
 import { parseDraft, toDraft, WeightsEditor, type WeightsDraft } from './WeightsEditor'
 
 const BUFFER_LABEL: Record<string, string> = { MTC_BUS: 'MTC buses', INTERCITY_BUS: 'Intercity buses', TRAIN_UNRESERVED: 'Unreserved coaches' }
@@ -69,7 +69,7 @@ export function RulesPanel() {
               <WeightsEditor value={weights} onChange={setWeights} />
             ) : (
               <div className="divide-y">
-                {Object.entries(rules.weights).map(([k, v]) => (
+                {byPoints(rules.weights).map(([k, v]) => (
                   <div key={k} className="flex justify-between py-1.5 text-base">
                     <span>{factorLabel(k)}</span><span className="font-mono font-semibold text-boarded">+{v}</span>
                   </div>

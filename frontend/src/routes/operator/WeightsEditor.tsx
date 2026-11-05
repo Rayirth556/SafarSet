@@ -1,10 +1,11 @@
 import type { Weights } from '@/api/types'
 import { Input } from '@/components/ui/input'
-import { factorLabel } from '@/lib/labels'
+import { byPoints, factorLabel } from '@/lib/labels'
 
 export type WeightsDraft = Record<string, string>
 
-export const toDraft = (w: Weights): WeightsDraft => Object.fromEntries(Object.entries(w).map(([k, v]) => [k, String(v)]))
+/** Key order is the display order: highest points first, fixed when editing starts so rows do not jump while typing. */
+export const toDraft = (w: Weights): WeightsDraft => Object.fromEntries(byPoints(w).map(([k, v]) => [k, String(v)]))
 
 /** Returns the numeric weights, or an error message. The server needs the exact key set, so every key is kept. */
 export function parseDraft(d: WeightsDraft): { weights: Weights } | { error: string } {

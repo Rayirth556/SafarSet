@@ -3,9 +3,11 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { AppHeader } from '@/components/common/AppHeader'
 import { LiveProvider } from '@/live/LiveProvider'
 import { queryClient } from '@/lib/queryClient'
+import { FieldPage } from '@/routes/field/FieldPage'
 import { OperatorPage } from '@/routes/operator/OperatorPage'
+import { PhonePage } from '@/routes/phone/PhonePage'
 
-// Built in later phases (F3 field + phone, F4 demo controls + /demo).
+// Built in F4: demo controls and the /demo page.
 function Later({ name }: { name: string }) {
   return (
     <>
@@ -23,8 +25,9 @@ export default function App() {
           <Routes>
             <Route path="/" element={<Navigate to="/operator" replace />} />
             <Route path="/operator" element={<OperatorPage />} />
-            <Route path="/field" element={<Later name="Field view" />} />
-            <Route path="/phone/:id" element={<Later name="Passenger phone" />} />
+            <Route path="/field" element={<FieldPage />} />
+            <Route path="/phone" element={<PhonePage />} />
+            <Route path="/phone/:id" element={<PhonePage />} />
             <Route path="/sim" element={<Later name="Demo controls" />} />
             <Route path="/demo" element={<Later name="Demo" />} />
             <Route path="*" element={<Navigate to="/operator" replace />} />

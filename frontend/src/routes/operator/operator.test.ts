@@ -50,3 +50,37 @@ describe('parseDraft', () => {
     expect(parseDraft({ a: '-1' })).toHaveProperty('error')
   })
 })
+
+import { byPoints } from '@/lib/labels'
+import { displayNames } from '@/lib/vehicles'
+
+describe('displayNames', () => {
+  const v = (vehicle_id: string, name: string | null) => ({ vehicle_id, name, label: '' })
+  it('numbers vehicles that share a name, specials in id order', () => {
+    const n = displayNames([v('BUS-SPL-04', 'MTC 120 R1'), v('BUS-SPL-02', 'MTC 120 R1'), v('TRAIN-12607', 'Lalbagh Express')])
+    expect(n.get('BUS-SPL-02')).toBe('MTC 120 R1 · Special 1/2')
+    expect(n.get('BUS-SPL-04')).toBe('MTC 120 R1 · Special 2/2')
+    expect(n.get('TRAIN-12607')).toBe('Lalbagh Express')
+  })
+  it('numbers non-special duplicates without the word Special, and falls back to the id when unnamed', () => {
+    const n = displayNames([v('BUS-REG-1', 'MTC 54'), v('BUS-REG-2', 'MTC 54'), v('X-9', null)])
+    expect(n.get('BUS-REG-2')).toBe('MTC 54 · 2/2')
+    expect(n.get('X-9')).toBe('X-9')
+  })
+})
+
+describe('byPoints', () => {
+  it('orders highest points first, not alphabetically', () => {
+    expect(byPoints({ a_low: 6, z_high: 40, m_mid: 25 }).map(([k]) => k)).toEqual(['z_high', 'm_mid', 'a_low'])
+  })
+})
+
+import { showLangBadge } from '@/routes/phone/PhonePage'
+
+describe('phone language badge', () => {
+  it('hides the badge for English when the mock is English-only, but never hides Tamil', () => {
+    expect(showLangBadge(true, 'en')).toBe(false)
+    expect(showLangBadge(true, 'ta')).toBe(true)
+    expect(showLangBadge(false, 'en')).toBe(true)
+  })
+})
