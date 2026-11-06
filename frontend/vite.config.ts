@@ -6,7 +6,9 @@ import { defineConfig } from 'vitest/config'
 const backend = process.env.SAFARSET_BACKEND ?? 'http://127.0.0.1:8000'
 
 // The browser talks to one origin. `/sim` is also a page route, so only `/sim/<something>` (the demo-control API) is proxied.
+// VITE_BASE is the path the site is served from: '/' locally and on Vercel, '/SafarSet/' on GitHub Pages.
 export default defineConfig({
+  base: process.env.VITE_BASE ?? '/',
   plugins: [react(), tailwindcss()],
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
   server: {
