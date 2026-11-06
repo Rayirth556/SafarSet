@@ -37,8 +37,6 @@ jobs:
       # GitHub Pages has no SPA fallback: a deep link such as /operator needs the app shell at 404.html
       - run: cp frontend/dist/index.html frontend/dist/404.html
       - uses: actions/configure-pages@v5
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: frontend/dist
