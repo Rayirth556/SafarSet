@@ -33,6 +33,7 @@ jobs:
         working-directory: frontend
         env:
           VITE_BASE: /SafarSet/
+          VITE_REPLAY: '1'
           VITE_API_BASE: ${{ vars.VITE_API_BASE }}
       # GitHub Pages has no SPA fallback: a deep link such as /operator needs the app shell at 404.html
       - run: cp frontend/dist/index.html frontend/dist/404.html

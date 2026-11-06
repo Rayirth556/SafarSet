@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { qk } from '@/live/invalidation'
 import { wsUrlFor } from '@/api/base'
+import { REPLAY } from '@/api/client'
 
 const BACKOFF_MS = [500, 1000, 2000, 4000, 5000]
 
@@ -12,7 +13,7 @@ const BACKOFF_MS = [500, 1000, 2000, 4000, 5000]
 export function usePhoneSocket(key: string, enabled: boolean) {
   const qc = useQueryClient()
   useEffect(() => {
-    if (!enabled) return
+    if (!enabled || REPLAY) return          // the replay has no server to push
     let closed = false
     let attempt = 0
     let ws: WebSocket | undefined

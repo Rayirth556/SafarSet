@@ -1,5 +1,6 @@
 import type { PriorityOverview as PriorityOverviewType } from '@/api/types'
 import { plural } from '@/lib/format'
+import { REPLAY } from '@/api/client'
 
 interface Props {
   overview?: PriorityOverviewType
@@ -21,7 +22,7 @@ export function PriorityOverview({ overview }: Props) {
         </div>
         <div className="flex items-center gap-2 text-xs font-mono text-ink-2">
           <span className="inline-block size-2 rounded-full bg-confirmed" />
-          <span>Live backend SQLite projection</span>
+          <span>{REPLAY ? 'Recorded demo (replay)' : 'Live backend SQLite projection'}</span>
         </div>
       </div>
 

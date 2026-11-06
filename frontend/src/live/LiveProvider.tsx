@@ -5,6 +5,7 @@ import { LiveContext, type LiveStatus } from './context'
 import { ALL_KEYS, keysForTopics, qk } from './invalidation'
 import { LiveRouter } from './router'
 import { wsUrlFor } from '@/api/base'
+import { REPLAY } from '@/api/client'
 
 
 const PING_MS = 20_000
@@ -18,11 +19,17 @@ function wsUrl() {
 /** One shared `/ws` connection per page. Feeds the TanStack cache; components only read queries. */
 export function LiveProvider({ children }: { children: ReactNode }) {
   const qc = useQueryClient()
-  const [status, setStatus] = useState<LiveStatus>('connecting')
+  const [status, setStatus] = useState<LiveStatus>(REPLAY ? 'replay' : 'connecting')
   const [lastSeq, setLastSeq] = useState<number | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
 
   useEffect(() => {
+    if (REPLAY) {
+      // no socket in the replay: a recorded step change refreshes every screen instead of a server push
+      const onStep = () => { for (const queryKey of ALL_KEYS) void qc.invalidateQueries({ queryKey }) }
+      window.addEventListener('safarset:replay-step', onStep)
+      return () => window.removeEventListener('safarset:replay-step', onStep)
+    }
     let closed = false
     let attempt = 0
     let retry: ReturnType<typeof setTimeout> | undefined

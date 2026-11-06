@@ -21,7 +21,70 @@ export class ApiError extends Error {
   }
 }
 
+/** GitHub Pages build (VITE_REPLAY=1): there is no server. Screens read the recorded demo (public/replay, one file per step, written by
+ *  scripts/record_replay.py), and Next moves to the next recorded step. Live actions are refused with a clear message. */
+export const REPLAY = import.meta.env.VITE_REPLAY === '1'
+const REPLAY_STEP_KEY = 'safarset-replay-step'
+type Snapshot = Record<string, unknown>
+type ReplayTimeline = { total: number; steps: { step: number; label: string; at: string; kind: string; type: string }[] }
+const replayCache = new Map<number, Promise<Snapshot>>()
+
+function readReplayStep(): number {
+  try { return Math.max(0, Number(localStorage.getItem(REPLAY_STEP_KEY)) || 0) } catch { return 0 }
+}
+let replayStep = readReplayStep()
+
+function setReplayStep(n: number) {
+  replayStep = n
+  try { localStorage.setItem(REPLAY_STEP_KEY, String(n)) } catch { /* private window: the demo simply starts again on reload */ }
+  window.dispatchEvent(new Event('safarset:replay-step'))
+}
+
+function loadReplayStep(n: number): Promise<Snapshot> {
+  let p = replayCache.get(n)
+  if (!p) {
+    p = fetch(`${import.meta.env.BASE_URL}replay/steps/${n}.json`).then((r) => {
+      if (!r.ok) throw new ApiError(404, 'NotRecorded', `Demo step ${n} is not in the recording.`)
+      return r.json() as Promise<Snapshot>
+    })
+    replayCache.set(n, p)
+  }
+  return p
+}
+
+/** The recorded key: the path, then its query string with the parameters sorted (the form scripts/record_replay.py writes). */
+function replayKey(path: string): string {
+  const [p, q = ''] = path.split('?')
+  const params = new URLSearchParams(q)
+  params.sort()
+  const s = params.toString()
+  return s ? `${p}?${s}` : p
+}
+
+async function replayRequest<T>(method: string, path: string): Promise<T> {
+  if (method === 'GET') {
+    const data = await loadReplayStep(replayStep)
+    const k = replayKey(path)
+    if (!(k in data)) throw new ApiError(404, 'NotRecorded', 'This screen was not recorded in the demo replay.')
+    return data[k] as T
+  }
+  if (path === '/sim/timeline/next') {
+    const current = await loadReplayStep(replayStep)
+    const timeline = current['/sim/timeline'] as ReplayTimeline
+    if (replayStep >= timeline.total) throw new ApiError(409, 'TimelineDone', 'The scripted demo is finished. Use Reset to play it again.')
+    const played = timeline.steps[replayStep]
+    setReplayStep(replayStep + 1)
+    return { played: { step: played.step, label: played.label, at: played.at, kind: played.kind, type: played.type }, result: {}, next_step: replayStep } as T
+  }
+  if (path === '/sim/timeline/reset') {
+    setReplayStep(0)
+    return { next_step: 0 } as T
+  }
+  throw new ApiError(409, 'ReplayOnly', 'This is the recorded demo: use Next to move through it. Live actions need the server.')
+}
+
 export async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  if (REPLAY) return replayRequest<T>(method, path)
   let res: Response
   try {
     res = await fetch(`${API_BASE}${path}`, {

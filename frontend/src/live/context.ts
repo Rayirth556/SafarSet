@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react'
 
 /** connecting: no socket yet. live: snapshot received. resyncing: a sequence gap was found, waiting for a snapshot. reconnecting: socket lost. */
-export type LiveStatus = 'connecting' | 'live' | 'resyncing' | 'reconnecting'
+export type LiveStatus = 'connecting' | 'live' | 'resyncing' | 'reconnecting' | 'replay'
 
 /** One wording for the connection state on every screen. `live` is the colour of the dot as well. */
 export const STATUS_LABEL: Record<LiveStatus, { text: string; tone: 'ok' | 'warn' | 'bad' }> = {
@@ -9,6 +9,7 @@ export const STATUS_LABEL: Record<LiveStatus, { text: string; tone: 'ok' | 'warn
   connecting: { text: 'Connecting…', tone: 'warn' },
   resyncing: { text: 'Resyncing…', tone: 'warn' },
   reconnecting: { text: 'Reconnecting…', tone: 'bad' },
+  replay: { text: 'Recorded demo', tone: 'ok' },
 }
 
 interface LiveValue { status: LiveStatus; lastSeq: number | null }
