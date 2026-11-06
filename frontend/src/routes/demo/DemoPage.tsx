@@ -8,6 +8,7 @@ import { qk } from '@/live/invalidation'
 import { pnrTail } from '@/lib/format'
 import { nameOf, useVehicleIndex } from '@/lib/vehicles'
 import { cn } from '@/lib/utils'
+import { JudgeGuideModal } from './JudgeGuideModal'
 import { TimelineCard } from '@/routes/sim/SimPage'
 import { useActions } from '@/routes/sim/actions'
 
@@ -59,6 +60,7 @@ export function DemoPage() {
   const act = useActions(state?.loaded ? state.clock : null)
 
   const scripted = (timeline?.steps.find((s) => s.type === 'LOAD_REPORT')?.payload as { vehicle_id?: string } | undefined)?.vehicle_id
+  const [showGuide, setShowGuide] = useState(false)
   const [vehicleId, setVehicleId] = useState<string | null>(null)
   const [phoneKey, setPhoneKey] = useState<string | null>(null)
   const fieldVehicle = vehicleId ?? scripted ?? vehicles?.[0]?.vehicle_id ?? null
@@ -108,6 +110,13 @@ export function DemoPage() {
             >
               ↺ Reset to 14:00
             </button>
+            <button
+              className="rounded border border-saffron bg-saffron/15 px-3 py-1 text-xs font-bold text-saffron transition hover:bg-saffron/30"
+              onClick={() => setShowGuide(true)}
+              data-testid="judge-guide-btn"
+            >
+              🎓 Judge Guide &amp; Architecture
+            </button>
           </div>
         )}
 
@@ -155,6 +164,8 @@ export function DemoPage() {
           <p className="font-mono text-sm text-ink-2">{act.log[0]?.text}</p>
         </details>
       )}
+
+      <JudgeGuideModal open={showGuide} onClose={() => setShowGuide(false)} />
     </div>
   )
 }

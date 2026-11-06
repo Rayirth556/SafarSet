@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { AppHeader } from '@/components/common/AppHeader'
 import { ErrorNote, Loading, NoScenario } from '@/components/common/Panels'
 import { useAppState } from '@/hooks/useAppState'
+import { JudgeGuideModal } from '../demo/JudgeGuideModal'
 import { ApprovalPanel } from './ApprovalPanel'
 import { ConflictsPanel } from './ConflictsPanel'
 import { CapacityPanel } from './CapacityPanel'
@@ -18,6 +19,7 @@ import { WhyPanel } from './WhyPanel'
 export function OperatorPage() {
   const { data, error, isLoading } = useAppState()
   const [selected, setSelected] = useState<string | null>(null)
+  const [showGuide, setShowGuide] = useState(false)
   // a group picked from the approval panel is explained far below it, so bring the explanation into view
   const explain = (groupId: string) => {
     setSelected(groupId)
@@ -32,6 +34,16 @@ export function OperatorPage() {
         {data && !data.loaded && <NoScenario />}
         {data?.loaded && (
           <>
+            <div className="flex justify-end">
+              <button
+                className="rounded-lg border border-saffron/60 bg-saffron/10 px-3.5 py-1.5 text-sm font-bold text-navy dark:text-saffron transition hover:bg-saffron/25 flex items-center gap-2 shadow-sm"
+                onClick={() => setShowGuide(true)}
+                data-testid="operator-judge-guide-btn"
+              >
+                <span>🎓</span>
+                <span>Judge Guide &amp; Prioritisation Architecture</span>
+              </button>
+            </div>
             <DisruptionBanner state={data} />
             <PriorityOverview overview={data.kpis.priority_overview} />
             <KpiTiles kpis={data.kpis} />
@@ -49,6 +61,7 @@ export function OperatorPage() {
               <RulesPanel />
               <EventLog />
             </div>
+            <JudgeGuideModal open={showGuide} onClose={() => setShowGuide(false)} />
           </>
         )}
       </main>
