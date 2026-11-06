@@ -63,7 +63,7 @@ def main():
 
     procs = []
     try:
-        backend = subprocess.Popen([sys.executable, "-m", "uvicorn", "safarset.api.app:app", "--port", str(args.port)], cwd=ROOT / "backend")
+        backend = subprocess.Popen([sys.executable, "-m", "uvicorn", "safarset.api.app:app", "--port", str(args.port), "--reload"], cwd=ROOT / "backend")
         procs.append(backend)
         wait_for_backend(backend)
         if args.load:

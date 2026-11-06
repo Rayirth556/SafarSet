@@ -84,9 +84,33 @@ export function DemoPage() {
 
   return (
     <div className="min-h-screen overflow-hidden bg-page">
-      <div className="flex items-center gap-4 border-b-[3px] border-saffron bg-navy px-5 py-2 text-white" style={{ height: HEADER }}>
+      <div className="flex flex-wrap items-center gap-4 border-b-[3px] border-saffron bg-navy px-5 py-2 text-white" style={{ minHeight: HEADER }}>
         <span className="text-lg font-bold">SafarSet</span>
         <span className="text-sm text-white/80">Operator · field · passenger, live</span>
+
+        {state?.loaded && timeline && (
+          <div className="mx-auto flex flex-wrap items-center gap-2.5 rounded-lg border border-white/20 bg-white/10 px-3 py-1 font-mono text-xs">
+            <span className="font-bold text-saffron uppercase">5-Min Demo:</span>
+            <span>Step {Math.min(timeline.next_step + 1, timeline.total)} of {timeline.total}</span>
+            <button
+              className="rounded bg-saffron px-3 py-1 text-xs font-bold text-navy transition hover:bg-saffron/90 disabled:opacity-40"
+              disabled={act.busy || (timeline.next_step >= timeline.total)}
+              onClick={() => void act.run('', api.timelineNext)}
+              data-testid="header-demo-next"
+            >
+              {timeline.next_step >= timeline.total ? 'Timeline finished' : `Next ▶ ${timeline.steps[timeline.next_step]?.label ?? ''}`}
+            </button>
+            <button
+              className="rounded border border-white/40 px-2.5 py-1 text-xs text-white transition hover:bg-white/20 disabled:opacity-40"
+              disabled={act.busy}
+              onClick={() => void act.run('Timeline reset', api.timelineReset)}
+              data-testid="header-demo-reset"
+            >
+              ↺ Reset to 14:00
+            </button>
+          </div>
+        )}
+
         <span className="ml-auto flex items-center gap-2 text-sm">
           <span className={cn('size-2.5 rounded-full', { ok: 'bg-confirmed', warn: 'bg-tentative', bad: 'bg-unresolved' }[STATUS_LABEL[status].tone])} />{STATUS_LABEL[status].text}
           {state?.loaded && <span className="font-mono font-semibold">SIM {state.clock}</span>}
@@ -124,7 +148,7 @@ export function DemoPage() {
       )}
 
       {state?.loaded && (
-        <details className="fixed bottom-3 right-3 z-10 w-[420px] rounded-xl border-2 border-dashed border-ink bg-[#ece9df] px-4 py-2 font-mono text-ink shadow-lg">
+        <details open className="fixed bottom-3 right-3 z-20 w-[430px] rounded-xl border-2 border-dashed border-ink bg-[#ece9df] px-4 py-2 font-mono text-ink shadow-2xl">
           <summary className="cursor-pointer text-sm font-bold uppercase tracking-widest">Demo control (not part of the product)</summary>
           <TimelineCard act={act} compact />
           {act.error && <p role="alert" className="font-mono text-sm text-unresolved-ink">{act.error.message}</p>}
