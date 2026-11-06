@@ -185,6 +185,8 @@ def _make_groups(seed, n, p, cxl, cancel_min):
                 "has_senior": "senior" in flags, "has_child_under_12": "child" in flags,
                 "pregnant": "pregnant" in flags, "disability": "disability" in flags,
                 "medical_need": "disability" in flags or "pregnant" in flags,
+                "medical_emergency": bool("disability" in flags and size == 1 and gi == 7),
+                "verified_critical": bool("disability" in flags and size == 1 and gi == 7),
                 "deadline_min": deadline,
                 "language": "ta" if rng.random() < 0.55 else "en",
                 "phone": f"+91000{rng.randint(0, 9999999):07d}",   # obviously fake, not a valid Indian mobile

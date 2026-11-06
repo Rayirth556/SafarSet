@@ -106,6 +106,31 @@ async def get_rules(request: Request):
     return views.rules(_st(request).conn)
 
 
+@router.get("/priority-policy")
+async def get_priority_policy(request: Request):
+    from ..scoring.policy import load_priority_policy
+    return load_priority_policy().model_dump()
+
+
+@router.put("/priority-policy")
+async def put_priority_policy(request: Request, body: dict):
+    from ..scoring.policy import PriorityPolicy, get_default_policy_path, load_priority_policy
+    st = _st(request)
+    ts = _ts(st, body.get("ts_sim"))
+    try:
+        policy_data = body.get("policy", body)
+        updated_policy = PriorityPolicy.model_validate(policy_data)
+    except Exception as e:
+        raise HTTPException(422, detail={"error": str(e), "kind": "InvalidPolicy"}) from e
+
+    path = get_default_policy_path()
+    path.write_text(json.dumps(updated_policy.model_dump(), indent=2), encoding="utf-8")
+    load_priority_policy(reload=True)
+
+    bid = await st.mutate(lambda: st.engine.replan(ts, fresh=True, force=True, cause="POLICY_SIMULATION"))
+    return {"status": "ok", "batch_id": bid, "policy": updated_policy.model_dump()}
+
+
 @router.put("/rules")
 async def put_rules(request: Request, body: models.RulesBody):
     st = _st(request)
@@ -140,3 +165,27 @@ async def override(request: Request, group_id: str, body: models.OverrideBody):
     res = await st.mutate(lambda: st.engine.override(group_id, body.action, body.reason, pool_id=body.pool_id, board_idx=body.board_idx,
                                                     alight_idx=body.alight_idx, ts_sim=ts))
     return {"seq": res.seq, "batch_id": res.batch_id}
+
+
+@router.post("/groups/{group_id}/verify")
+async def verify_group(request: Request, group_id: str, body: models.VerifyGroupBody):
+    st = _st(request)
+    ts = _ts(st, body.ts_sim)
+
+    def fn():
+        g = st.conn.execute("SELECT attrs FROM groups WHERE group_id = ?", (group_id,)).fetchone()
+        if not g:
+            raise HTTPException(404, detail={"error": f"group {group_id} not found", "kind": "NotFound"})
+        attrs = json.loads(g["attrs"])
+        if body.verification_type == "CRITICAL_EMERGENCY":
+            attrs["medical_emergency"] = body.verified
+            attrs["verified_critical"] = body.verified
+            attrs["critical_verification_reason"] = body.reason
+        elif body.verification_type == "COMPANIONS":
+            attrs["companion_verified"] = body.verified
+            attrs["companion_verification_reason"] = body.reason
+        st.conn.execute("UPDATE groups SET attrs = ? WHERE group_id = ?", (json.dumps(attrs, sort_keys=True, ensure_ascii=False), group_id))
+        bid = st.engine.replan(ts, fresh=True, force=True, cause="OPERATOR_OVERRIDE")
+        return {"group_id": group_id, "verified": body.verified, "batch_id": bid}
+
+    return await st.mutate(fn)

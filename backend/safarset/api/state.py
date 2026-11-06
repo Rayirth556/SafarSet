@@ -34,6 +34,7 @@ TOPICS = {
     "COMMAND_REJECTED": [],
     "CLOCK_SET": ["sim"],
     "GROUP_SELF_BOARDED": ["field", "capacity", "passengers", "unresolved", "batch", "kpis"],
+    "PASSENGER_ESCALATED": ["passengers", "batch", "kpis"],
 }
 
 

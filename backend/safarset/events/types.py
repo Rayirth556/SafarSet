@@ -156,6 +156,14 @@ class SimParamsChanged(_Base):
     params: dict
 
 
+class PassengerEscalated(_Base):
+    group_id: str
+    from_tier: int = Field(ge=0, le=2)
+    to_tier: int = Field(ge=0, le=2)
+    wait_min: int = Field(ge=0)
+    reason: str = Field(min_length=1)
+
+
 class CommandRejected(_Base):
     command_type: str
     error: str
@@ -168,5 +176,5 @@ EVENT_MODELS: dict[str, type[_Base]] = {
     "PLAN_PROPOSED": PlanProposed, "BATCH_APPROVED": BatchApproved, "SMS_SENT": SmsSent, "VEHICLE_DEPLOYED": VehicleDeployed,
     "OPERATOR_OVERRIDE": OperatorOverride, "WEIGHTS_CHANGED": WeightsChanged, "BUFFER_CHANGED": BufferChanged,
     "SIM_PARAMS_CHANGED": SimParamsChanged, "COMMAND_REJECTED": CommandRejected, "CLOCK_SET": ClockSet,
-    "GROUP_SELF_BOARDED": GroupSelfBoarded,
+    "GROUP_SELF_BOARDED": GroupSelfBoarded, "PASSENGER_ESCALATED": PassengerEscalated,
 }

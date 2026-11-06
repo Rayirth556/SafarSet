@@ -8,6 +8,7 @@ import { DisruptionBanner } from './DisruptionBanner'
 import { EventLog } from './EventLog'
 import { KpiTiles } from './KpiTiles'
 import { PassengerTable } from './PassengerTable'
+import { PriorityOverview } from './PriorityOverview'
 import { RulesPanel } from './RulesPanel'
 import { UnresolvedPanel } from './UnresolvedPanel'
 import { WhyPanel } from './WhyPanel'
@@ -25,6 +26,7 @@ export function OperatorPage() {
         {data?.loaded && (
           <>
             <DisruptionBanner state={data} />
+            <PriorityOverview overview={data.kpis.priority_overview} />
             <KpiTiles kpis={data.kpis} />
             <ApprovalPanel />
             <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">

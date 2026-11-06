@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useRules } from '@/hooks/queries'
 import { byPoints, factorLabel } from '@/lib/labels'
+import { PolicySimulator } from './PolicySimulator'
 import { parseDraft, toDraft, WeightsEditor, type WeightsDraft } from './WeightsEditor'
 
 const BUFFER_LABEL: Record<string, string> = { MTC_BUS: 'MTC buses', INTERCITY_BUS: 'Intercity buses', TRAIN_UNRESERVED: 'Unreserved coaches' }
@@ -18,6 +19,7 @@ export function RulesPanel() {
   const qc = useQueryClient()
   const { data: rules, error } = useRules()
   const [editing, setEditing] = useState(false)
+  const [simulating, setSimulating] = useState(false)
   const [weights, setWeights] = useState<WeightsDraft>({})
   const [buffers, setBuffers] = useState<Record<string, string>>({})
   const [localError, setLocalError] = useState<string | null>(null)
@@ -57,7 +59,7 @@ export function RulesPanel() {
       title="Rules in force"
       aside={rules && (editing
         ? <span className="flex gap-2"><Button variant="outline" onClick={() => setEditing(false)}>Cancel</Button><Button className="font-semibold" disabled={save.isPending} onClick={() => submit(rules)}>Save</Button></span>
-        : <Button variant="outline" onClick={() => start(rules)}>Edit</Button>)}
+        : <span className="flex gap-2"><Button variant="outline" onClick={() => setSimulating(true)}>Policy Simulator</Button><Button variant="outline" onClick={() => start(rules)}>Edit</Button></span>)}
     >
       <ErrorNote error={error} />
       {!rules && !error && <Loading what="rules" />}
@@ -111,6 +113,7 @@ export function RulesPanel() {
           <ErrorNote error={save.error} />
         </div>
       )}
+      <PolicySimulator open={simulating} onClose={() => setSimulating(false)} />
     </Card>
   )
 }

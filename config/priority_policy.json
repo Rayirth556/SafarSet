@@ -1,0 +1,58 @@
+{
+  "_note": "SafarSet Passenger Prioritisation Policy Configuration. Validated on startup.",
+  "tiers": {
+    "0": {
+      "name": "CRITICAL",
+      "description": "Verified medical emergencies and explicitly operator-verified critical cases",
+      "rank": 0
+    },
+    "1": {
+      "name": "HIGH",
+      "description": "Passengers requiring assistance, disability, elderly needing assistance, unaccompanied minors",
+      "rank": 1
+    },
+    "2": {
+      "name": "STANDARD",
+      "description": "All other eligible passengers",
+      "rank": 2
+    }
+  },
+  "factor_weights": {
+    "waiting_time": 30,
+    "age_vulnerability": 20,
+    "journey_urgency": 25,
+    "additional_assistance": 15,
+    "disruption_impact": 10
+  },
+  "age_scoring": {
+    "senior_threshold": 60,
+    "elderly_assistance_threshold": 75,
+    "child_threshold": 12,
+    "infant_threshold": 5
+  },
+  "ageing": {
+    "rate_per_minute": 0.1,
+    "linear": true,
+    "uncapped": true
+  },
+  "escalation": {
+    "enabled": true,
+    "tier_2_max_wait_minutes": 45,
+    "escalate_to_tier": 1,
+    "allow_escalation_to_tier_0": false
+  },
+  "group_policy": {
+    "strategy": "highest_tier_member_average",
+    "companion_verification_required": false,
+    "max_unverified_group_size": 4
+  },
+  "reserved_vs_unreserved": {
+    "auto_rank_reserved_above_unreserved": false,
+    "reserved_priority_bonus": 0
+  },
+  "walk_on_policy": {
+    "individually_allocated": false,
+    "contribute_to_buffers": true,
+    "deduct_actual_boardings": true
+  }
+}

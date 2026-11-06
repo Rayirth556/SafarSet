@@ -109,7 +109,8 @@ def _fit_capacity(conn, seq, pool_id, new_caps, cause, allow_displace, buffer_ru
         cargs = [x for seg in over for x in (seg, seg)]
         for status in ("TENTATIVE", "CONFIRMED") if allow_displace else ("TENTATIVE",):
             victim = _one(conn, f"SELECT id FROM allocations WHERE pool_id = ? AND status = ? AND ({covers})"
-                                " ORDER BY score ASC, id DESC LIMIT 1", (pool_id, status, *cargs))
+                                " ORDER BY COALESCE(json_extract(reason, '$.score.tier'), json_extract(reason, '$.tier'), 2) DESC, score ASC, id DESC LIMIT 1",
+                          (pool_id, status, *cargs))
             if victim:
                 break
         else:
@@ -248,7 +249,8 @@ def load_report(conn, seq, p):
         return
     count = p.count if p.count is not None else pool["nominal"]      # no count reported: treat the vehicle as exactly full
     room = max(0, pool["nominal"] - count)
-    confirmed = conn.execute("SELECT id, size FROM allocations WHERE pool_id = ? AND status = 'CONFIRMED' ORDER BY score ASC, id DESC",
+    confirmed = conn.execute("SELECT id, size FROM allocations WHERE pool_id = ? AND status = 'CONFIRMED' "
+                             "ORDER BY COALESCE(json_extract(reason, '$.score.tier'), json_extract(reason, '$.tier'), 2) DESC, score ASC, id DESC",
                              (p.pool_id,)).fetchall()
     heads = sum(a["size"] for a in confirmed)
     for a in confirmed:
@@ -483,6 +485,21 @@ def group_self_boarded(conn, seq, p):
     conn.execute("DELETE FROM group_holds WHERE group_id = ?", (p.group_id,))
 
 
+def passenger_escalated(conn, seq, p):
+    """Auditable wait escalation: Tier 2 passenger promoted to Tier 1 after exceeding maximum wait threshold."""
+    row = _one(conn, "SELECT attrs FROM groups WHERE group_id = ?", (p.group_id,))
+    if row is None:
+        raise Rejected(f"unknown group {p.group_id}")
+    attrs = json.loads(row["attrs"])
+    attrs["escalated"] = True
+    attrs["escalated_seq"] = seq
+    attrs["escalated_from_tier"] = p.from_tier
+    attrs["escalated_to_tier"] = p.to_tier
+    attrs["escalated_wait_min"] = p.wait_min
+    attrs["escalation_reason"] = p.reason
+    conn.execute("UPDATE groups SET attrs = ? WHERE group_id = ?", (_j(attrs), p.group_id))
+
+
 def _noop(conn, seq, p):
     pass
 
@@ -494,5 +511,5 @@ REDUCERS = {
     "PLAN_PROPOSED": plan_proposed, "BATCH_APPROVED": batch_approved, "SMS_SENT": sms_sent, "VEHICLE_DEPLOYED": vehicle_deployed,
     "OPERATOR_OVERRIDE": operator_override, "WEIGHTS_CHANGED": weights_changed, "BUFFER_CHANGED": buffer_changed,
     "SIM_PARAMS_CHANGED": sim_params_changed, "COMMAND_REJECTED": _noop, "CLOCK_SET": clock_set,
-    "GROUP_SELF_BOARDED": group_self_boarded,
+    "GROUP_SELF_BOARDED": group_self_boarded, "PASSENGER_ESCALATED": passenger_escalated,
 }

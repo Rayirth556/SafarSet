@@ -4,8 +4,9 @@ import math
 
 from ..domain import state as dstate
 from ..events.reducers import batch_is_stale
-from ..scoring import stub
+from ..scoring import priority, stub
 from ..scoring.interface import ScoreContext
+from ..scoring.policy import load_priority_policy
 
 STATES = ["UNAFFECTED", "UNRESOLVED", "TENTATIVE", "CONFIRMED", "BOARDED"]
 
@@ -42,8 +43,58 @@ def kpis(conn):
     # three disjoint populations: known PNR holders, ticketed unreserved (UTS) passengers, and an ESTIMATE of unregistered walk-ons
     composition = {"pnr_heads": comp["pnr"], "ticketed_unreserved_heads": comp["unres"],
                    "unreserved_estimate": {"heads": json.loads(est["value"]).get("heads", 0) if est else 0, "estimated": True}}
-    return {"composition": composition,"affected": affected, "tentative": out["TENTATIVE"], "confirmed": out["CONFIRMED"], "boarded": out["BOARDED"],
-            "unresolved": out["UNRESOLVED"],
+
+    policy = load_priority_policy()
+    groups = _group_rows(conn)
+    t0_g, t0_h = 0, 0
+    t1_g, t1_h = 0, 0
+    t2_g, t2_h = 0, 0
+    for g in groups:
+        if not g["affected"]:
+            continue
+        members = priority._extract_members(g)
+        tiers = [priority.evaluate_member_tier(m, g, policy)[0] for m in members]
+        tier = min(tiers) if tiers else 2
+        if tier < 2 and len(members) > policy.group_policy.max_unverified_group_size:
+            if not bool((g.get("attrs") or {}).get("companion_verified")):
+                tier = 2
+        if (g.get("attrs") or {}).get("escalated") and tier == 2:
+            tier = 1
+        if tier == 0:
+            t0_g += 1
+            t0_h += g["size"]
+        elif tier == 1:
+            t1_g += 1
+            t1_h += g["size"]
+        else:
+            t2_g += 1
+            t2_h += g["size"]
+
+    accommodated_g = out["TENTATIVE"]["groups"] + out["CONFIRMED"]["groups"] + out["BOARDED"]["groups"]
+    accommodated_h = out["TENTATIVE"]["heads"] + out["CONFIRMED"]["heads"] + out["BOARDED"]["heads"]
+
+    free_cap = _one(conn, """
+        SELECT COALESCE(SUM(free_seats), 0) AS total_free FROM (
+            SELECT pool_id, MIN(cap - used) AS free_seats
+            FROM segment_capacity JOIN pools USING (pool_id)
+            JOIN vehicles USING (vehicle_id)
+            WHERE vehicles.role = 'ALLOCATION' AND vehicles.status = 'SCHEDULED'
+            GROUP BY pool_id
+        )
+    """)
+    available_cap = free_cap["total_free"] if free_cap else 0
+
+    priority_overview = {
+        "tier_0": {"groups": t0_g, "heads": t0_h},
+        "tier_1": {"groups": t1_g, "heads": t1_h},
+        "tier_2": {"groups": t2_g, "heads": t2_h},
+        "accommodated": {"groups": accommodated_g, "heads": accommodated_h},
+        "unresolved": out["UNRESOLVED"],
+        "available_capacity": available_cap,
+    }
+
+    return {"composition": composition, "affected": affected, "tentative": out["TENTATIVE"], "confirmed": out["CONFIRMED"], "boarded": out["BOARDED"],
+            "unresolved": out["UNRESOLVED"], "priority_overview": priority_overview,
             "displaced_awaiting_replacement": {"groups": len(displaced), "heads": sum(sizes[g] for g in displaced)},
             "held_by_operator": {"groups": len(held), "heads": sum(h["size"] for h in held.values())}}
 
@@ -128,10 +179,60 @@ def _group_rows(conn):
 
 def scores(conn, groups, now_min):
     """Fresh score and rank (allocator order) for every affected group: gid -> (result, rank)."""
-    ctx = ScoreContext(now_min=now_min, weights=dstate.current_weights(conn))
-    scored = [(g, stub.score(g, ctx)) for g in groups if g["affected"]]
-    scored.sort(key=lambda x: (-x[1]["total"], x[0]["booking_time"], x[0]["pnr"] is None, x[0]["pnr"] or "", x[0]["group_id"]))
-    return {g["group_id"]: ({"total": r["total"], "breakdown": [list(b) for b in r["breakdown"]]}, i) for i, (g, r) in enumerate(scored, 1)}
+    weights = dstate.current_weights(conn)
+    ctx = ScoreContext(now_min=now_min, weights=weights)
+    is_legacy = bool(weights and any(k in weights for k in ("senior_60_plus", "medical_disability")))
+    scored = []
+    for g in groups:
+        if not g["affected"]:
+            continue
+        p_res = priority.score(g, ctx)
+        if is_legacy:
+            s_stub = stub.score(g, ctx)
+            res = {
+                "total": s_stub["total"],
+                "breakdown": [list(b) for b in s_stub["breakdown"]],
+                "tier": p_res.get("tier", 2),
+                "tier_name": p_res.get("tier_name", "STANDARD"),
+                "tier_reason": p_res.get("tier_reason", ""),
+                "base_score": p_res.get("base_score", s_stub["total"]),
+                "effective_score": p_res.get("effective_score", s_stub["total"]),
+                "ageing": p_res.get("ageing", 0.0),
+                "escalated": p_res.get("escalated", False),
+                "escalation_reason": p_res.get("escalation_reason"),
+                "factor_scores": p_res.get("factor_scores", {}),
+                "factor_weights": p_res.get("factor_weights", {}),
+            }
+        else:
+            res = {
+                "total": p_res["total"],
+                "breakdown": [list(b) for b in p_res["breakdown"]],
+                "tier": p_res.get("tier", 2),
+                "tier_name": p_res.get("tier_name", "STANDARD"),
+                "tier_reason": p_res.get("tier_reason", ""),
+                "base_score": p_res.get("base_score", p_res["total"]),
+                "effective_score": p_res.get("effective_score", p_res["total"]),
+                "ageing": p_res.get("ageing", 0.0),
+                "escalated": p_res.get("escalated", False),
+                "escalation_reason": p_res.get("escalation_reason"),
+                "factor_scores": p_res.get("factor_scores", {}),
+                "factor_weights": p_res.get("factor_weights", {}),
+            }
+        scored.append((g, res))
+
+    if is_legacy:
+        scored.sort(key=lambda x: (-x[1]["total"], x[0]["booking_time"], x[0]["pnr"] is None, x[0]["pnr"] or "", x[0]["group_id"]))
+    else:
+        def _group_sort_key(item):
+            g, s = item
+            tier_rank = s.get("tier", 2)
+            eff_score = s.get("effective_score", s["total"])
+            deadline = (g.get("attrs") or {}).get("deadline_min")
+            slack = (deadline - now_min) if deadline is not None else float("inf")
+            return (tier_rank, -eff_score, slack, g.get("booking_time", 0), g.get("pnr") is None, g.get("pnr") or "", g.get("group_id", ""))
+        scored.sort(key=_group_sort_key)
+
+    return {g["group_id"]: (r, i) for i, (g, r) in enumerate(scored, 1)}
 
 
 def _live(conn):
@@ -169,6 +270,13 @@ def passengers(conn, now_min, *, status=None, dest=None, q=None, limit=500, offs
         rows.append({"group_id": g["group_id"], "pnr": g["pnr"], "size": g["size"], "class": g["class"], "reserved": g["reserved"],
                      "known": bool(g["known"]), "dest_place": g["dest_place"], "dest_name": names.get(g["dest_place"]), "state": g["state"],
                      "score": s["total"] if s else None, "rank": rank, "score_breakdown": s["breakdown"] if s else None,
+                     "tier": s.get("tier", 2) if s else 2,
+                     "tier_name": s.get("tier_name", "STANDARD") if s else "STANDARD",
+                     "tier_reason": s.get("tier_reason") if s else None,
+                     "escalated": bool(s.get("escalated")) if s else False,
+                     "effective_score": s.get("effective_score", s["total"]) if s else None,
+                     "base_score": s.get("base_score") if s else None,
+                     "ageing": s.get("ageing") if s else None,
                      "flags": {"senior": a["has_senior"], "child": a["has_child_under_12"], "pregnant": a["pregnant"],
                                "disability": a["disability"], "wheelchair": g["requirements"].get("wheelchair", False),
                                "deadline": hhmm(a["deadline_min"])},
@@ -204,9 +312,21 @@ def why(conn, now_min, group_id):
     names = place_names(conn)
     decision = (reason or {}).get("text") or ((unresolved or {}).get("reason") or {}).get("text") or \
                (f"Held out of automatic planning by the operator: {held['why']}" if held else "Not affected by the disruption." if g["state"] == "UNAFFECTED" else "No decision yet.")
+    policy = load_priority_policy()
     return {"group": {"group_id": group_id, "pnr": g["pnr"], "size": g["size"], "class": g["class"], "reserved": g["reserved"], "known": bool(g["known"]),
                       "dest_place": g["dest_place"], "dest_name": names.get(g["dest_place"]), "requirements": g["requirements"], "attrs": g["attrs"]},
             "state": g["state"], "score": s, "rank": rank, "of": len(sc),
+            "tier": (s or {}).get("tier", (reason or {}).get("tier", 2)),
+            "tier_name": (s or {}).get("tier_name", (reason or {}).get("tier_name", "STANDARD")),
+            "tier_reason": (s or {}).get("tier_reason", (reason or {}).get("tier_reason", "")),
+            "escalated": (s or {}).get("escalated", (reason or {}).get("escalated", False)),
+            "escalation_reason": (s or {}).get("escalation_reason", (reason or {}).get("escalation_reason")),
+            "base_score": (s or {}).get("base_score"),
+            "effective_score": (s or {}).get("effective_score", (s or {}).get("total")),
+            "ageing": (s or {}).get("ageing"),
+            "factor_scores": (s or {}).get("factor_scores"),
+            "factor_weights": (s or {}).get("factor_weights"),
+            "priority_policy": policy.model_dump(),
             "stored_score_at_allocation": live["score"] if live else None, "allocation": _alloc_view(live, vehicle_of),
             "reason": reason, "decision_text": decision, "unresolved": unresolved, "held_by_operator": held,
             "displaced": group_id in dstate.load_displaced(conn), "boarded_on_own": g["self_boarded_vehicle"], "history": history}
@@ -289,9 +409,10 @@ def rules(conn):
     for r in _all(conn, "SELECT buffer_mode, MIN(nominal) nominal FROM pools WHERE buffer_mode IS NOT NULL GROUP BY buffer_mode"):
         modes[r["buffer_mode"]] = {"buffer_pct": buffers.get(r["buffer_mode"]), "example": f"{r['nominal']} × {round(buffers.get(r['buffer_mode'], 0) * 100)}% = {math.floor(r['nominal'] * buffers.get(r['buffer_mode'], 0) + 1e-9)}"}
     row = _one(conn, "SELECT value, version FROM settings WHERE key = 'scoring_weights'")
+    policy = load_priority_policy()
     return {"weights": dstate.current_weights(conn), "weights_version": row["version"] if row else 0, "weights_source": "operator" if row else "config/scoring_weights.json",
             "buffers": modes, "class_rank": json.loads(_one(conn, "SELECT value FROM settings WHERE key = 'class_rank'")["value"]),
-            "config": dstate.load_config(), "editable": {"weights": True, "buffers": True, "config": False},
+            "config": dstate.load_config(), "priority_policy": policy.model_dump(), "editable": {"weights": True, "buffers": True, "config": False},
             "note": "Weights are PLACEHOLDERS for the stub scorer; buffers apply to unreserved coaches and buses only (reserved coaches use exact vacancy)."}
 
 
@@ -312,8 +433,12 @@ def manifest(conn, vehicle_id):
     for a in _all(conn, """SELECT a.*, g.pnr, g.dest_place, g.class gclass, g.requirements, g.attrs FROM allocations a JOIN pools p USING (pool_id)
                            JOIN groups g USING (group_id) WHERE p.vehicle_id = ? AND a.status IN ('TENTATIVE','CONFIRMED','BOARDED')
                            ORDER BY CASE a.status WHEN 'BOARDED' THEN 0 WHEN 'CONFIRMED' THEN 1 ELSE 2 END, a.id""", vehicle_id):
+        reason_dict = json.loads(a["reason"]) if a["reason"] else {}
+        tier = reason_dict.get("tier", 2)
+        tier_name = reason_dict.get("tier_name", "STANDARD")
         rows.append({"allocation_id": a["id"], "group_id": a["group_id"], "pnr": a["pnr"], "size": a["size"], "class": a["gclass"], "pool_id": a["pool_id"],
                      "status": a["status"], "dest_place": a["dest_place"], "dest_name": names.get(a["dest_place"]),
+                     "tier": tier, "tier_name": tier_name,
                      "wheelchair": json.loads(a["requirements"]).get("wheelchair", False), "can_board": a["status"] == "CONFIRMED",
                      "note": "tentative: not yet approved, do not board" if a["status"] == "TENTATIVE" else None})
     boarded = sum(r["size"] for r in rows if r["status"] == "BOARDED")

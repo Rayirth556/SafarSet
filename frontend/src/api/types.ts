@@ -15,6 +15,15 @@ export interface Composition {
   /** estimate of unregistered walk-ons; NOT part of `affected` */
   unreserved_estimate: { heads: number; estimated: true }
 }
+export interface PriorityOverview {
+  tier_0: Heads
+  tier_1: Heads
+  tier_2: Heads
+  accommodated: Heads
+  unresolved: Heads
+  available_capacity: number
+}
+
 export interface Kpis {
   affected: Heads
   tentative: Heads
@@ -24,6 +33,7 @@ export interface Kpis {
   displaced_awaiting_replacement: Heads
   held_by_operator: Heads
   composition: Composition
+  priority_overview?: PriorityOverview
 }
 export interface BannerItem {
   seq: number
@@ -145,6 +155,13 @@ export interface Passenger {
   score: number | null
   rank: number | null
   score_breakdown: ScoreBreakdown | null
+  tier?: number
+  tier_name?: string
+  tier_reason?: string | null
+  escalated?: boolean
+  effective_score?: number | null
+  base_score?: number | null
+  ageing?: number | null
   flags: PassengerFlags
   language: string | null
   waiting_since: number
@@ -208,9 +225,20 @@ export interface Why {
     dest_place: string; dest_name: string | null; requirements: Record<string, unknown>; attrs: Record<string, unknown>
   }
   state: GroupState
-  score: { total: number; breakdown: ScoreBreakdown } | null
+  score: { total: number; breakdown: ScoreBreakdown; [k: string]: unknown } | null
   rank: number | null
   of: number
+  tier?: number
+  tier_name?: string
+  tier_reason?: string | null
+  escalated?: boolean
+  escalation_reason?: string | null
+  base_score?: number | null
+  effective_score?: number | null
+  ageing?: number | null
+  factor_scores?: Record<string, number>
+  factor_weights?: Record<string, number>
+  priority_policy?: Record<string, unknown>
   stored_score_at_allocation: number | null
   allocation: AllocationView | null
   reason: Reason | null
@@ -274,6 +302,7 @@ export interface Rules {
   buffers: Record<string, { buffer_pct: number | null; example: string }>
   class_rank: string[]
   config: Record<string, unknown>
+  priority_policy?: Record<string, unknown>
   editable: { weights: boolean; buffers: boolean; config: boolean }
   note: string
 }
@@ -326,6 +355,8 @@ export interface ManifestRow {
   wheelchair: boolean
   can_board: boolean
   note: string | null
+  tier?: number
+  tier_name?: string
 }
 export interface Manifest {
   vehicle_id: string

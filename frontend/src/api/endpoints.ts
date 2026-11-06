@@ -30,10 +30,15 @@ export const approveBatch = (id: string) => post<ApproveResult>(`/api/batches/${
 export const replan = (body: { fresh?: boolean; weights?: Weights } = {}) => post<{ batch_id: string; cause: string }>('/api/replan', body)
 export const fetchRules = () => get<Rules>('/api/rules')
 export const putRules = (body: { weights?: Weights; buffers?: Record<string, number> }) => put<Rules>('/api/rules', body)
+export const fetchPriorityPolicy = () => get<Record<string, unknown>>('/api/priority-policy')
+export const putPriorityPolicy = (policy: Record<string, unknown>, ts_sim?: number) =>
+  put<{ status: string; batch_id: string; policy: Record<string, unknown> }>('/api/priority-policy', { policy, ts_sim })
 export const fetchNotifier = () => get<NotifierStatus>('/api/notifier')
 export const fetchEvents = (q: EventsQuery = {}) => get<EventsPage>(`/api/events${qs({ ...q })}`)
 export const overrideGroup = (groupId: string, body: OverrideBody) =>
   post<{ seq: number; batch_id: string | null }>(`/api/groups/${enc(groupId)}/override`, body)
+export const verifyGroup = (groupId: string, body: { verification_type: 'CRITICAL_EMERGENCY' | 'COMPANIONS'; verified?: boolean; reason: string; ts_sim?: number }) =>
+  post<{ group_id: string; verified: boolean; batch_id: string | null }>(`/api/groups/${enc(groupId)}/verify`, body)
 
 // ------------------------------------------------------------------ field (/api/field)
 export const fetchFieldVehicles = () => get<FieldVehicle[]>('/api/field/vehicles')

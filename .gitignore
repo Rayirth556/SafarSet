@@ -19,3 +19,4 @@ frontend/*.tsbuildinfo
 .env.*
 *.pem
 *.key
+uv.lock

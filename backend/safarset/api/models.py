@@ -33,6 +33,13 @@ class OverrideBody(_Body):
     ts_sim: int | None = None
 
 
+class VerifyGroupBody(_Body):
+    verification_type: Literal["CRITICAL_EMERGENCY", "COMPANIONS"]
+    verified: bool = True
+    reason: str = Field(min_length=3)
+    ts_sim: int | None = None
+
+
 class BoardBody(_Body):
     allocation_id: int | None = None
     group_id: str | None = None

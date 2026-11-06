@@ -47,6 +47,7 @@ class Plan:
     summary: dict = field(default_factory=dict)
     sizes: dict = field(default_factory=dict)          # group_id -> heads
     items: list = None                                 # set by the diff builder
+    escalations: list = field(default_factory=list)    # auditable wait-escalations
 
     def default_items(self):
         items = [{"kind": "PLACED", "group_id": a["group_id"],
@@ -149,7 +150,10 @@ def _reason_text(rank, n, sc, ch, why, preferred, tol, vehicles):
                 "BEST_FIT": f"Arrivals within {tol} min count as equal and class is equal; this option leaves the least spare capacity.",
                 "ARRIVAL": "Equal on class and fit; this option arrives earlier.",
                 "MODE_TIER": "Equal on everything else; trains are preferred over buses on a tie."}.get(why, "Chosen by a deterministic tie-break.")
-    parts = [f"Priority rank {rank} of {n} (score {sc['total']:g}).",
+    tier_info = f"Tier {sc.get('tier', 2)} ({sc.get('tier_name', 'STANDARD')})"
+    if sc.get("escalated"):
+        tier_info += " [Escalated from Tier 2]"
+    parts = [f"Priority rank {rank} of {n} ({tier_info}, score {sc['total']:g}).",
              f"Placed on {_vehicle_name(v)}, departing {hhmm(ch['depart_min'])}, arriving {hhmm(ch['arrive_min'])}.", why_text]
     if ch["class_step"] == "UPGRADE":
         parts.append("Seat is in a higher class than the ticket (upgrade).")
@@ -191,9 +195,14 @@ def _unresolved_reason(rank, n, sc, rejects, counts, stability=None):
         else:
             text += (f" It would fit if lower-priority tentative group(s) {', '.join(stability['blocked_by'])} moved, but none could move "
                      "without being worse off (stability rule). 'Adjust weights and re-run' re-plans from scratch.")
-    return {"algorithm": ALGORITHM, "unresolved": True, "rank": rank, "of": n, "score": sc, "primary_cause": cause,
-            "binding": binding, "rejections_by_code": dict(sorted(counts.items())),
-            "stability": stability or None, "text": f"Priority rank {rank} of {n}. " + text}
+    tier_info = f"Tier {sc.get('tier', 2)} ({sc.get('tier_name', 'STANDARD')})"
+    if sc.get("escalated"):
+        tier_info += " [Escalated]"
+    return {"algorithm": ALGORITHM, "unresolved": True, "rank": rank, "of": n, "score": sc,
+            "tier": sc.get("tier", 2), "tier_name": sc.get("tier_name", "STANDARD"), "tier_reason": sc.get("tier_reason", ""),
+            "escalated": sc.get("escalated", False), "escalation_reason": sc.get("escalation_reason"),
+            "primary_cause": cause, "binding": binding, "rejections_by_code": dict(sorted(counts.items())),
+            "stability": stability or None, "text": f"Priority rank {rank} of {n} ({tier_info}). " + text}
 
 
 # ----------------------------------------------------------------------------------- alternatives for unplaced groups
@@ -295,10 +304,45 @@ class _Run:
         self.held = held
         sctx = ScoreContext(now_min=now_min, weights=weights)
         scored = [(g, scorer(g, sctx)) for g in groups if g["group_id"] not in held]
-        scored.sort(key=lambda x: (-x[1]["total"], x[0]["booking_time"], x[0]["pnr"] is None, x[0]["pnr"] or "", x[0]["group_id"]))
+
+        def _group_sort_key(item):
+            g, s = item
+            tier_rank = s.get("tier", 2)
+            eff_score = s.get("effective_score", s["total"])
+            deadline = (g.get("attrs") or {}).get("deadline_min")
+            slack = (deadline - now_min) if deadline is not None else float("inf")
+            return (
+                tier_rank,
+                -eff_score,
+                slack,
+                g.get("booking_time", 0),
+                g.get("pnr") is None,
+                g.get("pnr") or "",
+                g.get("group_id", "")
+            )
+
+        scored.sort(key=_group_sort_key)
         self.n = len(scored)
         self.g = {g["group_id"]: g for g, _ in scored}
-        self.sc = {g["group_id"]: {"total": s["total"], "breakdown": [list(x) for x in s["breakdown"]]} for g, s in scored}
+        self.sc = {}
+        for g, s in scored:
+            entry = {"total": s["total"], "breakdown": [list(x) for x in s["breakdown"]]}
+            for k in ("tier", "tier_name", "tier_reason", "base_score", "effective_score",
+                      "ageing", "escalated", "escalation_reason", "factor_scores", "factor_weights"):
+                if k in s:
+                    entry[k] = s[k]
+            self.sc[g["group_id"]] = entry
+        self.escalations = [
+            {
+                "group_id": g["group_id"],
+                "from_tier": 2,
+                "to_tier": s.get("tier", 1),
+                "wait_min": int(max(0, now_min - g.get("waiting_since", now_min))),
+                "reason": s.get("escalation_reason") or "Wait time exceeded threshold",
+            }
+            for g, s in scored
+            if s.get("escalated") and not (g.get("attrs") or {}).get("escalated")
+        ]
         self.rank = {g["group_id"]: i for i, (g, _) in enumerate(scored, 1)}
         self.order = [g["group_id"] for g, _ in scored]
         self.pinned = pinned
@@ -494,7 +538,7 @@ class _Run:
     # -- results
     def finish(self, failed):
         plan = Plan(order=list(self.order), reshuffles=self.reshuffles, unpinned=self.unpinned,
-                    sizes={gid: g['size'] for gid, g in self.g.items()})
+                    sizes={gid: g['size'] for gid, g in self.g.items()}, escalations=self.escalations)
         for gid in self.order:
             p = self.place.get(gid)
             if p:

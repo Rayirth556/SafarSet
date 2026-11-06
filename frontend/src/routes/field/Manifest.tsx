@@ -2,7 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { boardGroup } from '@/api/endpoints'
 import type { ManifestRow } from '@/api/types'
 import { ErrorNote, Loading } from '@/components/common/Panels'
-import { Pill } from '@/components/common/StatusChip'
+import { Pill, TierChip } from '@/components/common/StatusChip'
 import { Button } from '@/components/ui/button'
 import { useManifest } from '@/hooks/queries'
 import { pnrTail } from '@/lib/format'
@@ -17,9 +17,10 @@ function Row({ vehicleId, row }: { vehicleId: string; row: ManifestRow }) {
     <li className="rounded-lg border bg-card px-3 py-3" data-testid={`manifest-${row.group_id}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-base font-semibold">
+          <div className="flex items-center gap-1.5 text-base font-semibold">
             <span className="font-mono">{row.group_id}</span>
             <span className="font-normal text-ink-2"> · {row.size === 1 ? '1 person' : `group of ${row.size}`}</span>
+            {row.tier != null && <TierChip tier={row.tier} name={row.tier_name} />}
           </div>
           <div className="font-mono text-sm text-ink-2">{row.pnr ? `PNR ${pnrTail(row.pnr)}` : 'UTS · unreserved'} · {row.class}</div>
           <div className="mt-0.5 text-base">to {row.dest_name ?? row.dest_place} {row.wheelchair && <Pill tone="info" className="ml-1">wheelchair</Pill>}</div>

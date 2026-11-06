@@ -5,17 +5,28 @@ const prettify = (key: string) => {
   return s.charAt(0).toUpperCase() + s.slice(1)
 }
 
-// Readable names for the stub scorer's keys. The real scorer may use other keys: those fall back to a prettified key.
+// Readable names for scoring keys.
 const FACTORS: Record<string, string> = {
   medical_disability: 'Medical need / disability',
   senior_60_plus: 'Senior citizen (60+)',
   child_or_pregnant: 'Children / pregnant',
   hard_deadline: 'Hard deadline',
   reserved_pnr: 'Reserved ticket (PNR)',
-  ageing: 'Time waited (ageing)',
+  ageing: 'Waiting-time ageing',
   ageing_per_hour: 'Time waited, per hour',
+  waiting_time: 'Waiting time / delay',
+  age_vulnerability: 'Age-related vulnerability',
+  journey_urgency: 'Journey urgency',
+  additional_assistance: 'Additional assistance',
+  disruption_impact: 'Disruption impact',
 }
 export const factorLabel = (k: string) => FACTORS[k] ?? prettify(k)
+
+export const TIER_LABEL: Record<number, string> = {
+  0: 'Tier 0 · Critical',
+  1: 'Tier 1 · High',
+  2: 'Tier 2 · Standard',
+}
 
 const CAUSES: Record<string, string> = {
   TRAIN_CANCELLED: 'Train cancelled', TRAIN_DELAYED: 'Train delayed', ROAD_CLOSED: 'Road closed', LOAD_REPORT: 'Load report from the field',
