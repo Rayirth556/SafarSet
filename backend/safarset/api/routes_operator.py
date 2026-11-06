@@ -78,6 +78,16 @@ async def get_batch(request: Request, batch_id: str):
     return out
 
 
+@router.get("/batches/{batch_id}/preview")
+async def preview_batch(request: Request, batch_id: str, kind: str | None = Query(None, pattern="^(NEW|CHANGED|DISPLACED_UNPLACED)$"),
+                        lang: str | None = Query(None, pattern="^(en|ta)$"), vehicle_id: str | None = None):
+    """What approving this batch would send (counts, and the real text for one example, optionally for one vehicle), without sending anything."""
+    st = _st(request)
+    if views.batch(st.conn, batch_id, with_items=False) is None:
+        raise HTTPException(404, detail={"error": f"unknown batch {batch_id}", "kind": "NotFound"})
+    return st.engine.preview_messages(batch_id, kind, lang, vehicle_id)
+
+
 @router.post("/batches/{batch_id}/approve")
 async def approve(request: Request, batch_id: str, body: models.ApproveBody | None = None):
     st = _st(request)

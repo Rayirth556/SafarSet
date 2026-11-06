@@ -230,6 +230,8 @@ export interface BatchItem {
   class: string
   dest_place: string
   dest_name: string | null
+  /** Who needs staff help: wheelchair, disability, senior, child, pregnant (per group). */
+  flags: PassengerFlags
   /** DISPLACED: replaced, cause, old_sms_still_held, operator_override. RESHUFFLED: forced, moved_from.
    *  UNRESOLVED: reason, alternatives, blocking_*. Placements: vehicle_id, pool_id, arrive_min, class_step. */
   detail: Record<string, unknown> & {
@@ -263,6 +265,20 @@ export interface Batch {
   items?: Partial<Record<DiffCategory, BatchItem[]>>
 }
 export interface BatchRow { batch_id: string; status: string; cause: string; proposed_seq: number; approved_seq: number | null }
+/** What approving a pending batch would send: counts per kind, and the real rendered text of one example. Nothing is sent by asking. */
+export interface BatchPreview {
+  batch_id: string
+  /** PROPOSED while it can still be approved; anything else means there is nothing left to send */
+  status: string
+  will_send: Record<PhoneKind, number> & { total: number }
+  by_language: Record<string, number>
+  /** messages per vehicle, by kind (a lost seat has no vehicle) */
+  by_vehicle: Record<PhoneKind, Record<string, number>>
+  sample: {
+    kind: PhoneKind; group_id: string; size: number; vehicle_id: string | null; lang: string; message: string
+    chars: number; segments: number; encoding: string; draft_translation: boolean
+  } | null
+}
 export interface ApproveResult { batch_id: string; seq: number; confirmed_groups: number; notified_groups: number }
 
 // ---------------------------------------------------------------------------------------------- rules / events / notifier

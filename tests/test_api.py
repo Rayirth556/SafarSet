@@ -275,6 +275,57 @@ def test_phone_mock_receives_messages_only_after_approval(cancelled):
     error(cancelled.get("/api/phone/NOPE/messages"), 404, "NotFound")
 
 
+# ================================================================================================ approval preview
+def test_preview_is_the_text_approval_sends_and_sends_nothing(cancelled):
+    en, ta = get(cancelled, "/api/batches/B1/preview?lang=en"), get(cancelled, "/api/batches/B1/preview?lang=ta")
+    w = en["will_send"]
+    assert w["total"] == w["NEW"] > 0 and w["CHANGED"] == w["DISPLACED_UNPLACED"] == 0       # the first plan only gives people journeys
+    assert sum(en["by_language"].values()) == w["total"]
+    s = en["sample"]
+    assert s["kind"] == "NEW" and s["lang"] == "en" and s["message"].startswith("SafarSet") and s["chars"] == len(s["message"])
+    assert ta["sample"]["group_id"] == s["group_id"] and ta["sample"]["lang"] == "ta" and ta["sample"]["draft_translation"] is True
+    assert get(cancelled, f"/api/phone/{s['group_id']}/messages")["messages"] == []                 # previewing sent nothing
+    res = cancelled.post("/api/batches/B1/approve").json()
+    assert res["notified_groups"] == w["total"]                                                      # exactly the announced number of messages
+    (sent,) = get(cancelled, f"/api/phone/{s['group_id']}/messages")["messages"]
+    assert sent["message"] == {"en": en, "ta": ta}[sent["lang"]]["sample"]["message"]                # the text previewed is the text sent
+    after = get(cancelled, "/api/batches/B1/preview")                                                # once approved there is nothing left to send
+    assert after["status"] == "APPROVED" and after["will_send"]["total"] == 0 and after["sample"] is None
+    error(cancelled.get("/api/batches/NOPE/preview"), 404, "NotFound")
+
+
+def test_every_group_gets_its_own_message_so_the_preview_can_be_chosen_by_vehicle(cancelled):
+    p = get(cancelled, "/api/batches/B1/preview")
+    per_vehicle = p["by_vehicle"]["NEW"]
+    assert sum(per_vehicle.values()) == p["will_send"]["NEW"] and len(per_vehicle) > 1               # the groups go on several vehicles
+    texts = {}
+    for vehicle in per_vehicle:
+        s = get(cancelled, f"/api/batches/B1/preview?vehicle_id={vehicle}")["sample"]
+        assert s["vehicle_id"] == vehicle
+        texts[vehicle] = s["message"]
+    assert len(set(texts.values())) == len(texts)                                                    # not one message for everybody
+    assert get(cancelled, "/api/batches/B1/preview?vehicle_id=NOPE")["sample"] is None
+    assert get(cancelled, "/api/batches/B1/preview")["sample"]["vehicle_id"] in per_vehicle          # the default example names its vehicle too
+
+
+def test_preview_of_a_replan_counts_changed_journeys_and_lost_seats(approved):
+    bid = approved.post("/sim/inject-overcrowd").json()["batch_id"]
+    p = get(approved, f"/api/batches/{bid}/preview")
+    w = p["will_send"]
+    assert w["total"] == w["NEW"] + w["CHANGED"] + w["DISPLACED_UNPLACED"] and w["CHANGED"] + w["DISPLACED_UNPLACED"] > 0
+    for kind, words in (("CHANGED", "CHANGED"), ("DISPLACED_UNPLACED", "earlier seat is gone")):
+        if w[kind]:
+            s = get(approved, f"/api/batches/{bid}/preview?kind={kind}")["sample"]
+            assert s["kind"] == kind and words in s["message"]
+    assert approved.post(f"/api/batches/{bid}/approve").json()["notified_groups"] == w["total"]
+    error(approved.get(f"/api/batches/{bid}/preview?kind=SHOUT"), 422)
+
+
+def test_batch_items_carry_the_needs_help_flags(cancelled):
+    items = get(cancelled, "/api/batches/B1")["items"]["NEWLY_PLACED"]
+    assert items and set(items[0]["flags"]) == {"senior", "child", "pregnant", "disability", "wheelchair", "deadline"}
+
+
 # ================================================================================================ demo controls
 def test_sim_delay_close_road_overcrowd_second_chart_vacancies_and_params(approved):
     r = approved.post("/sim/delay-train", json={"vehicle_id": "TRAIN-SIM-ALT-2", "delay_min": 45}).json()

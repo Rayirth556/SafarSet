@@ -7,7 +7,7 @@ export function DisruptionBanner({ state }: { state: LoadedState }) {
   const { banner, kpis } = state
   if (!banner.active) {
     return (
-      <div className="rounded-xl border bg-card px-5 py-4">
+      <div className="rounded-xl border bg-card px-5 py-4 shadow-panel">
         <div className="text-lg font-semibold">No disruption</div>
         <div className="text-ink-2">Waiting for a disruption. Everything shown here is SIMULATED.</div>
       </div>

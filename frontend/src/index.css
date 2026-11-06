@@ -45,6 +45,7 @@
   --font-sans: 'Inter Variable', system-ui, 'Nirmala UI', sans-serif;
   --font-heading: var(--font-sans);
   --font-mono: 'JetBrains Mono Variable', ui-monospace, monospace;
+  --shadow-panel: 0 1px 2px rgb(15 23 42 / 0.10), 0 8px 20px -4px rgb(15 23 42 / 0.18);
   --color-navy: var(--navy);
   --color-saffron: var(--saffron);
   --color-page: var(--page);
