@@ -29,7 +29,7 @@ function useDebounced<T>(value: T, ms = 250) {
 }
 
 function Flags({ p }: { p: Passenger }) {
-  const f = p.flags
+  const f = p.flags ?? {}
   const chips = [
     f.senior && 'senior', f.disability && 'medical / disability', f.wheelchair && 'wheelchair', f.child && 'child', f.pregnant && 'pregnant',
     f.deadline && `deadline ${f.deadline}`,

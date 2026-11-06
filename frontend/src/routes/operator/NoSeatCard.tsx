@@ -36,7 +36,7 @@ export function NoSeatCard({ heads, groups, dests }: { heads: number; groups: nu
               <span className="min-w-28 font-semibold">{d.dest_name ?? d.dest_place}</span>
               <span className="font-mono">{d.heads}</span>
               <span>{cause}</span>
-              {best && <Pill>Best option: {ALT_LABEL[best.type].toLowerCase()}</Pill>}
+              {best && <Pill>Best option: {(ALT_LABEL[best.type] ?? best.type).toLowerCase()}</Pill>}
             </li>
           )
         })}

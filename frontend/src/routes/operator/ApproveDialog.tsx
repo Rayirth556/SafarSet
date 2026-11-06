@@ -31,14 +31,15 @@ export function ApproveDialog({ open, onClose, batchId, summary, onApprove, pend
   const { data: capacity } = useCapacity('ALLOCATION')
   const names = useVehicleIndex()
   const sample = preview?.sample ?? null
-  const messages = preview?.will_send.total
+  const messages = preview?.will_send?.total
   const languages = Object.entries(preview?.by_language ?? {})
 
   // vehicles that have a message of the shown kind, earliest departure first
   const departs = new Map(capacity?.map((v) => [v.vehicle_id, { at: v.depart_min, text: v.depart }]))
-  const perVehicle = Object.entries(preview?.by_vehicle[sample?.kind ?? 'NEW'] ?? {})
+  const byVehicle = preview?.by_vehicle
+  const perVehicle = Object.entries(byVehicle?.[sample?.kind ?? 'NEW'] ?? {})
     .sort(([a], [b]) => (departs.get(a)?.at ?? 0) - (departs.get(b)?.at ?? 0) || a.localeCompare(b))
-  const journeys = new Set(KINDS.flatMap((k) => Object.keys(preview?.by_vehicle[k] ?? {}))).size
+  const journeys = new Set(KINDS.flatMap((k) => Object.keys(byVehicle?.[k] ?? {}))).size
 
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose() }}>
@@ -56,9 +57,9 @@ export function ApproveDialog({ open, onClose, batchId, summary, onApprove, pend
             {journeys > 0 && <> ({plural(journeys, 'vehicle')} in this plan)</>}. Choose one to see the exact text.
           </p>
           <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Kind of message">
-            {KINDS.filter((k) => (preview?.will_send[k] ?? 0) > 0).map((k) => (
+            {KINDS.filter((k) => (preview?.will_send?.[k] ?? 0) > 0).map((k) => (
               <button key={k} className={chip(sample?.kind === k)} aria-pressed={sample?.kind === k} onClick={() => { setKind(k); setVehicleId(undefined) }}>
-                {SMS_KIND_LABEL[k]} <span className="font-mono font-normal">{preview!.will_send[k]}</span>
+                {SMS_KIND_LABEL[k]} <span className="font-mono font-normal">{preview?.will_send?.[k]}</span>
               </button>
             ))}
             <span className="ml-auto flex gap-1" role="group" aria-label="Language">

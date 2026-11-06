@@ -11,7 +11,8 @@ export const HELP_LABEL: Record<HelpKind, string> = { wheelchair: 'Wheelchair', 
 const HELP_ORDER: HelpKind[] = ['wheelchair', 'medical', 'senior', 'child']
 
 /** What a group needs from staff. A group is listed once per kind; the flags say that someone in the group has the need, not how many. */
-export function helpKinds(f: PassengerFlags): HelpKind[] {
+export function helpKinds(f?: PassengerFlags | null): HelpKind[] {
+  if (!f) return []
   const out: HelpKind[] = []
   if (f.wheelchair) out.push('wheelchair')
   if (f.disability) out.push('medical')

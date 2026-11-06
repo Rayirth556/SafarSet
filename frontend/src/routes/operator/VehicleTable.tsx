@@ -36,7 +36,7 @@ function Group({ g, onSelect }: { g: PlanGroup; onSelect?: (id: string) => void 
       <span className="text-ink-2">{plural(i.size, 'person', 'people')}{i.pnr ? ` · PNR ${pnrTail(i.pnr)}` : ' · unreserved'} · to {i.dest_name ?? i.dest_place}</span>
       {g.arriveMin != null && <span className="font-mono text-ink-2">arrives {hhmm(g.arriveMin)}</span>}
       {helpKinds(i.flags).map((k) => <Pill key={k} tone={k === 'wheelchair' ? 'warn' : 'neutral'}>{HELP_LABEL[k]}</Pill>)}
-      <Pill>{CATEGORY_NOTE[g.category as keyof typeof CATEGORY_NOTE]}</Pill>
+      <Pill>{CATEGORY_NOTE[g.category as keyof typeof CATEGORY_NOTE] ?? g.category}</Pill>
       {i.detail.operator_override && <Pill tone="info">operator override</Pill>}
     </div>
   )

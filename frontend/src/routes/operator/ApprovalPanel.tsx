@@ -69,7 +69,7 @@ export function ApprovalPanel({ onSelect }: { onSelect?: (groupId: string) => vo
 
   const stillHeld = (batch.items?.DISPLACED ?? []).filter((i) => i.detail.old_sms_still_held).length
   const tent = batch.allocations.tentative
-  const sentence = consequence({ groups: tent.groups, people: tent.heads, messages: preview?.will_send.total ?? null, noSeatPeople: batch.diff.UNRESOLVED.heads,
+  const sentence = consequence({ groups: tent.groups, people: tent.heads, messages: preview?.will_send?.total ?? null, noSeatPeople: batch.diff.UNRESOLVED.heads,
     kinds: preview?.will_send })
   return (
     <div className="rounded-xl border border-tentative/50 bg-tentative/10" data-testid="approval-panel">
