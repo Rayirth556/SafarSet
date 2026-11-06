@@ -50,6 +50,11 @@ class Notifier:
             lang = lang if lang in render.LANGUAGES else "en"
             return render.load_templates(lang)["messages"]["FALLBACK"], None, lang
 
+    def preview(self, group, allocation, kind, ctx, lang):
+        """The text a passenger would receive, without sending or logging it: the same renderer and fallback as notify()."""
+        text, reason, lang = self._render(group, allocation, kind, ctx, lang)
+        return {"lang": lang, "message": text, "reason": reason, **render.sms_stats(text), "draft_translation": lang == "ta"}
+
     def notify(self, group, allocation, kind, ctx=None):
         preferred = group["attrs"].get("language", "en")
         phone_lang = "en" if self.phone_mock_english_only else preferred

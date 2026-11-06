@@ -1,6 +1,6 @@
 import { ApiError, get, post, put, qs } from './client'
 import type {
-  AppState, ApproveResult, Batch, BatchRow, Manifest, EventsPage, EventsQuery, FieldVehicle, LoadReportBody, LoadScenarioBody,
+  AppState, ApproveResult, Batch, BatchPreview, BatchRow, Manifest, PhoneKind, EventsPage, EventsQuery, FieldVehicle, LoadReportBody, LoadScenarioBody,
   LoadScenarioResult, NotifierStatus, OverrideBody, PassengerPage, PassengerQuery, PhoneThread, Rules, SimParams, SimResult, Timeline,
   TimelineNextResult, DepartResult, UnresolvedDest, Vehicle, VacancyBody, Why, Weights,
 } from './types'
@@ -26,6 +26,7 @@ export const fetchUnresolved = () => get<UnresolvedDest[]>('/api/unresolved')
 export const fetchPendingBatch = () => get<Batch | null>('/api/batches/pending')
 export const fetchBatches = () => get<BatchRow[]>('/api/batches')
 export const fetchBatch = (id: string) => get<Batch>(`/api/batches/${enc(id)}`)
+export const fetchBatchPreview = (id: string, q: { kind?: PhoneKind; lang?: string; vehicle_id?: string } = {}) => get<BatchPreview>(`/api/batches/${enc(id)}/preview${qs({ ...q })}`)
 export const approveBatch = (id: string) => post<ApproveResult>(`/api/batches/${enc(id)}/approve`)
 export const replan = (body: { fresh?: boolean; weights?: Weights } = {}) => post<{ batch_id: string; cause: string }>('/api/replan', body)
 export const fetchRules = () => get<Rules>('/api/rules')

@@ -128,16 +128,70 @@ class Engine:
         return self.handle("OPERATOR_OVERRIDE", "operator", payload, ts_sim)
 
     # ------------------------------------------------------------------ approval (approval only)
+    def _approval_audience(self, batch_id):
+        """Who approving `batch_id` messages: its tentative allocations, the groups that held a seat and lost it, and the displaced groups
+        this plan leaves without a seat. Read before the approval changes the states."""
+        tentative = self.conn.execute(
+            "SELECT id, group_id, score FROM allocations WHERE batch_id = ? AND status = 'TENTATIVE'", (batch_id,)).fetchall()
+        was_displaced = {r["group_id"] for r in self.conn.execute(
+            "SELECT DISTINCT group_id FROM allocations WHERE status = 'DISPLACED'")}
+        unplaced_displaced = [r["group_id"] for r in self.conn.execute(
+            "SELECT group_id FROM batch_items WHERE batch_id = ? AND kind = 'DISPLACED' AND json_extract(detail, '$.replaced') = 0", (batch_id,))]
+        return tentative, was_displaced, unplaced_displaced
+
+    def preview_messages(self, batch_id, kind=None, lang=None, vehicle_id=None):
+        """What approving a pending batch would send, without sending or logging anything: how many messages of each kind (and, for the
+        journeys, how many per vehicle), and the real text (same context and renderer as approve) for the best-scored group of one kind,
+        optionally only among the groups going on one vehicle. Every group gets its own message, so the example depends on the vehicle.
+        `kind` defaults to the first kind present."""
+        status = self.conn.execute("SELECT status FROM plan_batches WHERE batch_id = ?", (batch_id,)).fetchone()
+        if status is None:
+            raise Rejected(f"unknown batch {batch_id}")
+        if status["status"] != "PROPOSED":                       # already approved or replaced: nothing is left to send (a read, so no error)
+            return {"batch_id": batch_id, "status": status["status"], "will_send": {"NEW": 0, "CHANGED": 0, "DISPLACED_UNPLACED": 0, "total": 0},
+                    "by_language": {}, "by_vehicle": {"NEW": {}, "CHANGED": {}, "DISPLACED_UNPLACED": {}}, "sample": None}
+        tentative, was_displaced, unplaced = self._approval_audience(batch_id)
+        vehicle_of = {r["id"]: r["vehicle_id"] for r in self.conn.execute(
+            "SELECT a.id, p.vehicle_id FROM allocations a JOIN pools p USING (pool_id) WHERE a.batch_id = ? AND a.status = 'TENTATIVE'", (batch_id,))}
+        by_kind = {"NEW": [], "CHANGED": [], "DISPLACED_UNPLACED": []}
+        for t in sorted(tentative, key=lambda t: (-t["score"], t["id"])):                # best-scored first: that group is the example
+            by_kind["CHANGED" if t["group_id"] in was_displaced else "NEW"].append((t["group_id"], t["id"]))
+        by_kind["DISPLACED_UNPLACED"] = [(gid, None) for gid in unplaced]
+        will_send = {k: len(v) for k, v in by_kind.items()} | {"total": sum(len(v) for v in by_kind.values())}
+        languages = {}
+        for gid, _ in (pair for pairs in by_kind.values() for pair in pairs):
+            row = self.conn.execute("SELECT attrs FROM groups WHERE group_id = ?", (gid,)).fetchone()
+            code = json.loads(row["attrs"]).get("language", "en")
+            languages[code] = languages.get(code, 0) + 1
+        by_vehicle = {k: {} for k in by_kind}                    # a lost seat has no allocation, so no vehicle
+        for k, pairs in by_kind.items():
+            for _, alloc_id in pairs:
+                if alloc_id is not None:
+                    by_vehicle[k][vehicle_of[alloc_id]] = by_vehicle[k].get(vehicle_of[alloc_id], 0) + 1
+        out = {"batch_id": batch_id, "status": "PROPOSED", "will_send": will_send, "by_language": languages, "by_vehicle": by_vehicle, "sample": None}
+        kind = kind or next((k for k in ("NEW", "CHANGED", "DISPLACED_UNPLACED") if by_kind[k]), None)
+        if kind is None or not by_kind.get(kind) or not hasattr(self.notifier, "preview"):
+            return out
+        pairs = [p for p in by_kind[kind] if vehicle_id is None or vehicle_of.get(p[1]) == vehicle_id]
+        if not pairs:                                            # no message of this kind for that vehicle
+            return out
+        gid, alloc_id = pairs[0]
+        g = dict(self.conn.execute("SELECT * FROM groups WHERE group_id = ?", (gid,)).fetchone())
+        g["requirements"], g["attrs"] = json.loads(g["requirements"]), json.loads(g["attrs"])
+        alloc = None
+        if alloc_id is not None:
+            alloc = dict(self.conn.execute("SELECT * FROM allocations WHERE id = ?", (alloc_id,)).fetchone())
+            alloc["reason"] = json.loads(alloc["reason"])
+        shown = self.notifier.preview(g, alloc, kind, self._notify_ctx(gid, alloc, kind, self._now(None)), lang or "en")
+        out["sample"] = {"kind": kind, "group_id": gid, "size": g["size"], "vehicle_id": vehicle_of.get(alloc_id), **shown}
+        return out
+
     def approve(self, batch_id=None, ts_sim=None):
         now = self._now(ts_sim)
         batch_id = batch_id or state.pending_batch_id(self.conn)
         if batch_id is None:
             raise Rejected("there is no pending batch to approve")
-        tentative = self.conn.execute("SELECT id, group_id FROM allocations WHERE batch_id = ? AND status = 'TENTATIVE'", (batch_id,)).fetchall()
-        was_displaced = {r["group_id"] for r in self.conn.execute(
-            "SELECT DISTINCT group_id FROM allocations WHERE status = 'DISPLACED'")}
-        unplaced_displaced = [r["group_id"] for r in self.conn.execute(
-            "SELECT group_id FROM batch_items WHERE batch_id = ? AND kind = 'DISPLACED' AND json_extract(detail, '$.replaced') = 0", (batch_id,))]
+        tentative, was_displaced, unplaced_displaced = self._approval_audience(batch_id)
         seq = apply_event(self.conn, "BATCH_APPROVED", "operator", {"batch_id": batch_id}, ts_sim=now)   # raises Rejected if stale
         result = Approval(batch_id, seq, [t["group_id"] for t in tentative])
         if self.notifier:

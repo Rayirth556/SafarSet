@@ -36,16 +36,26 @@ const CAUSES: Record<string, string> = {
 }
 export const causeLabel = (c: string) => CAUSES[c] ?? prettify(c.toLowerCase())
 
+// Plain words for the operator (a station master, not an engineer): what happens to the PASSENGER, not what the allocator did.
 export const DIFF_LABEL: Record<DiffCategory, string> = {
-  DISPLACED: 'Displaced', NEWLY_PLACED: 'Newly placed', RESHUFFLED: 'Reshuffled', PLACED: 'Unchanged', UNRESOLVED: 'Unresolved',
+  DISPLACED: 'Lost their seat', NEWLY_PLACED: 'Getting a seat', RESHUFFLED: 'Moved to another vehicle', PLACED: 'No change', UNRESOLVED: 'No seat yet',
 }
 export const DIFF_HELP: Record<DiffCategory, string> = {
-  DISPLACED: 'lost a seat they held',
-  NEWLY_PLACED: 'given a seat for the first time',
-  RESHUFFLED: 'moved to another vehicle',
-  PLACED: 'keep their seat',
+  DISPLACED: 'had a confirmed seat and cannot board',
+  NEWLY_PLACED: 'offered a seat for the first time',
+  RESHUFFLED: 'offered a different vehicle',
+  PLACED: 'keep the seat they have',
   UNRESOLVED: 'no seat; alternatives offered',
 }
+
+/** Why a group could not be placed, in a few words (the allocator's `primary_cause`). */
+export const UNRESOLVED_CAUSE: Record<string, string> = {
+  CAPACITY: 'No seats left', DEADLINE: 'Would miss their deadline', ACCESSIBILITY: 'No wheelchair-accessible vehicle',
+  NO_DEPARTURE_LEFT: 'Nothing leaves late enough', NO_VEHICLE_SERVES_DESTINATION: 'No vehicle goes there', OPERATOR_HOLD: 'Held by the operator',
+}
+export const unresolvedCause = (c: unknown) => (typeof c === 'string' ? UNRESOLVED_CAUSE[c] ?? prettify(c.toLowerCase()) : 'No seat available')
+
+export const SMS_KIND_LABEL = { NEW: 'New journey', CHANGED: 'Changed journey', DISPLACED_UNPLACED: 'Seat lost' } as const
 
 export const STATE_LABEL: Record<GroupState, string> = {
   UNAFFECTED: 'Unaffected', UNRESOLVED: 'Unresolved', TENTATIVE: 'Tentative', CONFIRMED: 'Confirmed', BOARDED: 'Boarded',

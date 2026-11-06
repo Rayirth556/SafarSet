@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 
 function Tile({ label, v, caption, dot, ink }: { label: string; v: Heads; caption: string; dot: string; ink: string }) {
   return (
-    <div className="rounded-xl border bg-card px-5 py-4">
+    <div className="rounded-xl border bg-card px-5 py-4 shadow-panel">
       <div className={cn('flex items-center gap-2 text-sm font-semibold uppercase tracking-wide', ink)}>
         <span className={cn('size-2.5 rounded-sm', dot)} />
         {label}

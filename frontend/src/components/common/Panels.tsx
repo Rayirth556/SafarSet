@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils'
 
 export function Card({ title, aside, children, className }: { title?: ReactNode; aside?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={cn('rounded-xl border bg-card p-5', className)}>
+    <section className={cn('rounded-xl border bg-card p-5 shadow-panel', className)}>
       {(title || aside) && (
         <div className="mb-3 flex items-center justify-between gap-3">
           {title && <h2 className="text-lg font-semibold">{title}</h2>}

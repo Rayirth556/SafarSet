@@ -250,6 +250,12 @@ def _alloc_view(a, vehicle_of):
             "class_flagged": ch.get("class_flagged"), "boarding_note": ch.get("boarding_note"), "score": a["score"]}
 
 
+def _flags(g):
+    a = g["attrs"]
+    return {"senior": a["has_senior"], "child": a["has_child_under_12"], "pregnant": a["pregnant"], "disability": a["disability"],
+            "wheelchair": g["requirements"].get("wheelchair", False), "deadline": hhmm(a["deadline_min"])}
+
+
 def passengers(conn, now_min, *, status=None, dest=None, q=None, limit=500, offset=0):
     groups = _group_rows(conn)
     sc = scores(conn, groups, now_min)
@@ -277,9 +283,7 @@ def passengers(conn, now_min, *, status=None, dest=None, q=None, limit=500, offs
                      "effective_score": s.get("effective_score", s["total"]) if s else None,
                      "base_score": s.get("base_score") if s else None,
                      "ageing": s.get("ageing") if s else None,
-                     "flags": {"senior": a["has_senior"], "child": a["has_child_under_12"], "pregnant": a["pregnant"],
-                               "disability": a["disability"], "wheelchair": g["requirements"].get("wheelchair", False),
-                               "deadline": hhmm(a["deadline_min"])},
+                     "flags": _flags(g),
                      "language": a.get("language"), "waiting_since": g["waiting_since"],
                      "allocation": _alloc_view(live.get(g["group_id"]), vehicle_of),
                      "displaced": g["group_id"] in displaced, "held_by_operator": g["group_id"] in held,
@@ -387,7 +391,7 @@ def batch(conn, batch_id, *, with_items=True):
             g = info[it["group_id"]]
             cats.setdefault(it["kind"], []).append({"group_id": it["group_id"], "pnr": g["pnr"], "size": g["size"], "class": g["class"],
                                                     "dest_place": g["dest_place"], "dest_name": names.get(g["dest_place"]),
-                                                    "detail": json.loads(it["detail"])})
+                                                    "flags": _flags(g), "detail": json.loads(it["detail"])})
         out["items"] = cats
     return out
 
