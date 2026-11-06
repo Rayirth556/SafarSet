@@ -189,6 +189,64 @@ def road_closed(conn, seq, p):
         _cancel_vehicle_pools(conn, seq, v["vehicle_id"], {"cause": "ROAD_CLOSED", "seq": seq, "route_id": p.route_id})
 
 
+def _store_claim(conn, seq, pool_id, seg, value, observed_at, source):
+    conn.execute("INSERT OR REPLACE INTO vacancy_claims VALUES (?,?,?,?,?,?)", (pool_id, seg, value, observed_at, source, seq))
+
+
+def _record_conflict(conn, seq, pool_id, seg, outcome, kept, other):
+    """kept and other are (value, source, observed_at) tuples."""
+    conn.execute("INSERT INTO field_conflicts (seq, pool_id, seg_idx, outcome, kept_value, kept_source, kept_observed_at,"
+                 " other_value, other_source, other_observed_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                 (seq, pool_id, seg, outcome, *kept, *other))
+
+
+def _resolve_vacancy_claim(conn, seq, p, seg):
+    """Two field sources can disagree about one segment. Arrival order is not evidence, so the reducer decides by observation time:
+      - no claim held yet                  -> accept
+      - newer observation than the one held -> accept (the held claim is superseded)
+      - older observation than the one held -> refuse, keep the held value, record STALE_IGNORED
+      - same observation time, different value -> keep the LOWER (safer: fewer seats to sell), record CONFLICT for the operator
+      - undated claim vs a dated one        -> refuse, record UNDATED_IGNORED
+      - undated vs undated                  -> the last arrival wins (events from before observation times existed)
+    Returns the value to apply to the segment, or None to leave the segment's capacity as it is."""
+    held = _one(conn, "SELECT * FROM vacancy_claims WHERE pool_id = ? AND seg_idx = ?", (p.pool_id, seg))
+    source = p.reported_by or "unknown"
+    if held is None:
+        _store_claim(conn, seq, p.pool_id, seg, p.vacancy, p.observed_at, source)
+        return p.vacancy
+    held_claim = (held["value"], held["source"], held["observed_at"])
+    new_claim = (p.vacancy, source, p.observed_at)
+    if p.observed_at is None and held["observed_at"] is None:
+        _store_claim(conn, seq, p.pool_id, seg, p.vacancy, None, source)
+        return p.vacancy
+    if p.observed_at is None:
+        if p.vacancy != held["value"]:
+            _record_conflict(conn, seq, p.pool_id, seg, "UNDATED_IGNORED", held_claim, new_claim)
+        return None
+    if held["observed_at"] is None or p.observed_at > held["observed_at"]:
+        _store_claim(conn, seq, p.pool_id, seg, p.vacancy, p.observed_at, source)
+        return p.vacancy
+    if p.observed_at < held["observed_at"]:
+        if p.vacancy != held["value"]:
+            _record_conflict(conn, seq, p.pool_id, seg, "STALE_IGNORED", held_claim, new_claim)
+        return None
+    if p.vacancy == held["value"]:
+        return None
+    safer = min(p.vacancy, held["value"])
+    _store_claim(conn, seq, p.pool_id, seg, safer, p.observed_at, "conflict")
+    _record_conflict(conn, seq, p.pool_id, seg, "CONFLICT", (safer, "conflict", p.observed_at), new_claim)
+    return safer
+
+
+def conflict_resolved(conn, seq, p):
+    c = _one(conn, "SELECT resolved FROM field_conflicts WHERE id = ?", (p.conflict_id,))
+    if c is None:
+        raise Rejected(f"unknown field conflict {p.conflict_id}")
+    if c["resolved"]:
+        raise Rejected(f"field conflict {p.conflict_id} is already reviewed")
+    conn.execute("UPDATE field_conflicts SET resolved = 1, resolved_seq = ?, resolved_note = ? WHERE id = ?", (seq, p.note, p.conflict_id))
+
+
 def vacancy_update(conn, seq, p):
     pool = _pool(conn, p.pool_id)
     if pool["kind"] != "RESERVED":
@@ -197,7 +255,12 @@ def vacancy_update(conn, seq, p):
         raise Rejected("segment range outside the pool")
     if p.vacancy > pool["nominal"]:
         raise Rejected(f"vacancy {p.vacancy} exceeds the pool's nominal {pool['nominal']}")
-    caps = {s: p.vacancy for s in range(p.from_seg, p.to_seg)}
+    caps = {}
+    for s in range(p.from_seg, p.to_seg):
+        value = _resolve_vacancy_claim(conn, seq, p, s)
+        if value is None:
+            value = _one(conn, "SELECT cap FROM segment_capacity WHERE pool_id = ? AND seg_idx = ?", (p.pool_id, s))["cap"]
+        caps[s] = value
     _fit_capacity(conn, seq, p.pool_id, caps, {"cause": "VACANCY_UPDATE", "seq": seq}, allow_displace=True)
 
 
@@ -511,5 +574,5 @@ REDUCERS = {
     "PLAN_PROPOSED": plan_proposed, "BATCH_APPROVED": batch_approved, "SMS_SENT": sms_sent, "VEHICLE_DEPLOYED": vehicle_deployed,
     "OPERATOR_OVERRIDE": operator_override, "WEIGHTS_CHANGED": weights_changed, "BUFFER_CHANGED": buffer_changed,
     "SIM_PARAMS_CHANGED": sim_params_changed, "COMMAND_REJECTED": _noop, "CLOCK_SET": clock_set,
-    "GROUP_SELF_BOARDED": group_self_boarded, "PASSENGER_ESCALATED": passenger_escalated,
+    "GROUP_SELF_BOARDED": group_self_boarded, "PASSENGER_ESCALATED": passenger_escalated, "CONFLICT_RESOLVED": conflict_resolved,
 }

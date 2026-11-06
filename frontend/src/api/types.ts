@@ -455,9 +455,31 @@ export interface DepartResult {
   params: SimParams
 }
 
+// ---------------------------------------------------------------------------------------------- field conflicts (constraint 2)
+/** STALE_IGNORED: an older reading arrived late and was refused. UNDATED_IGNORED: a report with no reading time was refused.
+ *  CONFLICT: two readings at the same time disagreed; the lower value was applied. */
+export type ConflictOutcome = 'STALE_IGNORED' | 'UNDATED_IGNORED' | 'CONFLICT'
+export interface FieldConflict {
+  id: number
+  seq: number
+  pool_id: string
+  seg_idx: number
+  outcome: ConflictOutcome
+  kept_value: number
+  kept_source: string
+  kept_observed_at: number | null
+  other_value: number
+  other_source: string
+  other_observed_at: number | null
+  resolved: boolean
+  resolved_seq: number | null
+  resolved_note: string | null
+}
+export interface ConflictsPage { open: number; items: FieldConflict[] }
+
 // ---------------------------------------------------------------------------------------------- live stream (WS /ws)
 export type Topic =
-  | 'banner' | 'capacity' | 'passengers' | 'unresolved' | 'batch' | 'kpis' | 'field' | 'rules' | 'phone' | 'sim' | 'all'
+  | 'banner' | 'capacity' | 'passengers' | 'unresolved' | 'batch' | 'kpis' | 'field' | 'rules' | 'phone' | 'sim' | 'conflicts' | 'all'
 
 export type WsMessage =
   | ({ type: 'snapshot' | 'reset' } & AppState)

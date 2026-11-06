@@ -201,6 +201,37 @@ CREATE TABLE field_reports (
     count INTEGER, reported_seq INTEGER NOT NULL
 );
 
+-- The accepted vacancy claim per segment: the one whose observation time is newest (see reducers._resolve_vacancy_claim).
+CREATE TABLE vacancy_claims (
+    pool_id TEXT NOT NULL REFERENCES pools(pool_id),
+    seg_idx INTEGER NOT NULL CHECK (seg_idx >= 0),
+    value INTEGER NOT NULL CHECK (value >= 0),
+    observed_at INTEGER CHECK (observed_at IS NULL OR observed_at >= 0),
+    source TEXT NOT NULL,
+    seq INTEGER NOT NULL,
+    PRIMARY KEY (pool_id, seg_idx)
+) WITHOUT ROWID;
+
+-- Disagreements between field claims, kept for the operator. outcome: STALE_IGNORED (an older observation was refused),
+-- UNDATED_IGNORED (an undated claim tried to override a dated one), CONFLICT (same observation time, different values: the lower
+-- value is applied and the operator must confirm it).
+CREATE TABLE field_conflicts (
+    id INTEGER PRIMARY KEY,
+    seq INTEGER NOT NULL,
+    pool_id TEXT NOT NULL REFERENCES pools(pool_id),
+    seg_idx INTEGER NOT NULL,
+    outcome TEXT NOT NULL CHECK (outcome IN ('STALE_IGNORED','UNDATED_IGNORED','CONFLICT')),
+    kept_value INTEGER NOT NULL,
+    kept_source TEXT NOT NULL,
+    kept_observed_at INTEGER,
+    other_value INTEGER NOT NULL,
+    other_source TEXT NOT NULL,
+    other_observed_at INTEGER,
+    resolved INTEGER NOT NULL DEFAULT 0 CHECK (resolved IN (0,1)),
+    resolved_seq INTEGER,
+    resolved_note TEXT
+);
+
 CREATE TABLE disruptions (
     seq INTEGER PRIMARY KEY, kind TEXT NOT NULL CHECK (kind IN ('TRAIN_CANCELLED','TRAIN_DELAYED','ROAD_CLOSED')),
     vehicle_id TEXT, route_id TEXT, detail TEXT NOT NULL CHECK (json_valid(detail))

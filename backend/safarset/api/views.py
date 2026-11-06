@@ -451,6 +451,13 @@ def manifest(conn, vehicle_id):
             "passengers": rows}
 
 
+# ------------------------------------------------------------------------------------------------ field conflicts
+def conflicts(conn):
+    """Every disagreement between field claims, newest first. Unreviewed ones come first so the operator sees them without scrolling."""
+    rows = _all(conn, "SELECT * FROM field_conflicts ORDER BY resolved, id DESC")
+    return {"open": sum(1 for r in rows if not r["resolved"]), "items": [dict(r, resolved=bool(r["resolved"])) for r in rows]}
+
+
 # ------------------------------------------------------------------------------------------------ phone
 def phone_messages(conn, key):
     g = _one(conn, "SELECT group_id, pnr FROM groups WHERE pnr = ? OR group_id = ?", key, key)

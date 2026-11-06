@@ -6,7 +6,7 @@ const names = (topics: Topic[]) => keysForTopics(topics).map((k) => k.join('/'))
 
 describe('keysForTopics', () => {
   it('covers every topic in docs/api.md', () => {
-    const documented: Topic[] = ['banner', 'capacity', 'passengers', 'unresolved', 'batch', 'kpis', 'field', 'rules', 'phone', 'sim', 'all']
+    const documented: Topic[] = ['banner', 'capacity', 'passengers', 'unresolved', 'batch', 'kpis', 'field', 'rules', 'phone', 'sim', 'conflicts', 'all']
     expect(Object.keys(TOPIC_KEYS).sort()).toEqual([...documented].sort())
   })
   it('maps a cancellation hint to the operator queries', () => {

@@ -30,6 +30,7 @@ export const useBatchPreview = (batchId: string, kind: PhoneKind | undefined, la
     placeholderData: (prev) => prev,
   })
 export const useRules = () => useQuery({ queryKey: qk.rules, queryFn: api.fetchRules, enabled: useLoaded() })
+export const useConflicts = () => useQuery({ queryKey: qk.conflicts, queryFn: api.fetchConflicts, enabled: useLoaded() })
 export const useEvents = (hideRejected: boolean) =>
   useQuery({
     queryKey: [...qk.events, hideRejected],

@@ -199,3 +199,16 @@ async def verify_group(request: Request, group_id: str, body: models.VerifyGroup
         return {"group_id": group_id, "verified": body.verified, "batch_id": bid}
 
     return await st.mutate(fn)
+
+
+@router.get("/conflicts")
+async def get_conflicts(request: Request):
+    return views.conflicts(_st(request).conn)
+
+
+@router.post("/conflicts/{conflict_id}/resolve")
+async def resolve_conflict(request: Request, conflict_id: int, body: models.ConflictResolveBody):
+    st = _st(request)
+    ts = _ts(st, body.ts_sim)
+    res = await st.mutate(lambda: st.engine.handle("CONFLICT_RESOLVED", "operator", {"conflict_id": conflict_id, "note": body.note}, ts))
+    return {"seq": res.seq, "conflict_id": conflict_id}

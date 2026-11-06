@@ -3,6 +3,7 @@ import { AppHeader } from '@/components/common/AppHeader'
 import { ErrorNote, Loading, NoScenario } from '@/components/common/Panels'
 import { useAppState } from '@/hooks/useAppState'
 import { ApprovalPanel } from './ApprovalPanel'
+import { ConflictsPanel } from './ConflictsPanel'
 import { CapacityPanel } from './CapacityPanel'
 import { DisruptionBanner } from './DisruptionBanner'
 import { EventLog } from './EventLog'
@@ -42,6 +43,7 @@ export function OperatorPage() {
                 <div id="why-panel"><WhyPanel groupId={selected} onSelect={setSelected} /></div>
               </div>
             </div>
+            <ConflictsPanel />
             <div className="grid items-start gap-5 lg:grid-cols-3">
               <div id={UNRESOLVED_ANCHOR} className="scroll-mt-24"><UnresolvedPanel onSelect={setSelected} /></div>
               <RulesPanel />

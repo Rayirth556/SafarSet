@@ -15,6 +15,7 @@ export const qk = {
   sim: ['sim'] as const,              // ['sim','params'], ['sim','timeline']
   events: ['events'] as const,
   notifier: ['notifier'] as const,
+  conflicts: ['conflicts'] as const,  // field reports that disagree (constraint 2)
 }
 
 const ALL: QueryKey[] = Object.values(qk)
@@ -29,6 +30,7 @@ export const TOPIC_KEYS: Record<Topic, readonly QueryKey[]> = {
   batch: [qk.batch],
   field: [qk.field],
   rules: [qk.rules],
+  conflicts: [qk.conflicts],
   phone: [qk.phone],
   sim: [qk.sim, qk.state],
   all: ALL,

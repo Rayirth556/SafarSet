@@ -1,6 +1,6 @@
 import { ApiError, get, post, put, qs } from './client'
 import type {
-  AppState, ApproveResult, Batch, BatchPreview, BatchRow, Manifest, PhoneKind, EventsPage, EventsQuery, FieldVehicle, LoadReportBody, LoadScenarioBody,
+  AppState, ApproveResult, Batch, BatchPreview, BatchRow, ConflictsPage, Manifest, PhoneKind, EventsPage, EventsQuery, FieldVehicle, LoadReportBody, LoadScenarioBody,
   LoadScenarioResult, NotifierStatus, OverrideBody, PassengerPage, PassengerQuery, PhoneThread, Rules, SimParams, SimResult, Timeline,
   TimelineNextResult, DepartResult, UnresolvedDest, Vehicle, VacancyBody, Why, Weights,
 } from './types'
@@ -36,6 +36,8 @@ export const putPriorityPolicy = (policy: Record<string, unknown>, ts_sim?: numb
   put<{ status: string; batch_id: string; policy: Record<string, unknown> }>('/api/priority-policy', { policy, ts_sim })
 export const fetchNotifier = () => get<NotifierStatus>('/api/notifier')
 export const fetchEvents = (q: EventsQuery = {}) => get<EventsPage>(`/api/events${qs({ ...q })}`)
+export const fetchConflicts = () => get<ConflictsPage>('/api/conflicts')
+export const resolveConflict = (conflictId: number, body: { note: string }) => post<{ seq: number; conflict_id: number }>(`/api/conflicts/${conflictId}/resolve`, body)
 export const overrideGroup = (groupId: string, body: OverrideBody) =>
   post<{ seq: number; batch_id: string | null }>(`/api/groups/${enc(groupId)}/override`, body)
 export const verifyGroup = (groupId: string, body: { verification_type: 'CRITICAL_EMERGENCY' | 'COMPANIONS'; verified?: boolean; reason: string; ts_sim?: number }) =>

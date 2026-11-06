@@ -30,10 +30,14 @@ class RoadClosed(_Base):
 
 
 class VacancyUpdate(_Base):                         # HHT-shaped: absolute vacancy for segments [from_seg, to_seg)
+    """observed_at is the sim minute the source read the vacancy, not when the report arrived. Two sources can disagree about a
+    segment (the chart and a TTE terminal); the reducer uses observed_at, never arrival order, to decide which claim stands.
+    Without observed_at the claim is undated: it never overrides a dated one."""
     pool_id: str
     from_seg: int = Field(ge=0)
     to_seg: int = Field(gt=0)
     vacancy: int = Field(ge=0)
+    observed_at: int | None = Field(default=None, ge=0, le=2880)
     reported_by: str = ""
 
 
@@ -125,6 +129,19 @@ class GroupSelfBoarded(_Base):                      # a confirmed group ignored 
     reason: str = ""
 
 
+class ConflictResolved(_Base):
+    """The operator has read a field disagreement and accepts the value in force. The note is mandatory, like an override reason."""
+    conflict_id: int = Field(ge=1)
+    note: str
+
+    @field_validator("note")
+    @classmethod
+    def _note_required(cls, v: str) -> str:
+        if len(v.strip()) < 5:
+            raise ValueError("marking a field conflict reviewed requires a note (at least 5 characters)")
+        return v.strip()
+
+
 class OperatorOverride(_Base):
     """ASSIGN: put the group on pool_id between board_idx and alight_idx (TENTATIVE, in the pending batch, needs approval).
     UNASSIGN: release its seat and hold it out of automatic planning. RESUME_AUTO: clear the hold. Reason is mandatory."""
@@ -176,5 +193,5 @@ EVENT_MODELS: dict[str, type[_Base]] = {
     "PLAN_PROPOSED": PlanProposed, "BATCH_APPROVED": BatchApproved, "SMS_SENT": SmsSent, "VEHICLE_DEPLOYED": VehicleDeployed,
     "OPERATOR_OVERRIDE": OperatorOverride, "WEIGHTS_CHANGED": WeightsChanged, "BUFFER_CHANGED": BufferChanged,
     "SIM_PARAMS_CHANGED": SimParamsChanged, "COMMAND_REJECTED": CommandRejected, "CLOCK_SET": ClockSet,
-    "GROUP_SELF_BOARDED": GroupSelfBoarded, "PASSENGER_ESCALATED": PassengerEscalated,
+    "GROUP_SELF_BOARDED": GroupSelfBoarded, "PASSENGER_ESCALATED": PassengerEscalated, "CONFLICT_RESOLVED": ConflictResolved,
 }

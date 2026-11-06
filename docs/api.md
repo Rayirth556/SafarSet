@@ -68,6 +68,6 @@ An end-to-end script that plays all of it and checks the state at every step: `p
 On connect: `{"type":"snapshot","loaded","last_seq","clock","banner","kpis","pending_batch","sim_params"}`.
 After every change, in this order: one `{"type":"event","seq","event"}` per new event (seq is contiguous: a gap means refetch),
 then `{"type":"kpis","kpis","clock","last_seq"}`, then `{"type":"invalidate","topics":[...],"last_seq"}`.
-Topics: `banner capacity passengers unresolved batch kpis field rules phone sim all`; refetch the matching REST endpoints.
+Topics: `banner capacity passengers unresolved batch kpis field rules phone sim conflicts all`; refetch the matching REST endpoints.
 `COMMAND_REJECTED` events carry `"rejected": true` so the UI can hide them. Other messages: `{"type":"reset", ...snapshot}`
 (a new scenario was loaded), `{"type":"clock"}`. Client may send `{"type":"ping"}` (reply `pong`) or `{"type":"snapshot"}`.

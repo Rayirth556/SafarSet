@@ -46,7 +46,8 @@ def state_dump(conn):
     for t, order in (("vehicles", "vehicle_id"), ("pools", "pool_id"), ("segment_capacity", "pool_id, seg_idx"),
                      ("groups", "group_id"), ("allocations", "id"), ("plan_batches", "batch_id"),
                      ("batch_items", "batch_id, item_idx"), ("batch_footprint", "batch_id, pool_id, seg_lo"),
-                     ("field_reports", "pool_id"), ("disruptions", "seq"), ("notifications", "id"),
+                     ("field_reports", "pool_id"), ("vacancy_claims", "pool_id, seg_idx"), ("field_conflicts", "id"),
+                     ("disruptions", "seq"), ("notifications", "id"),
                      ("settings", "key"), ("group_holds", "group_id"), ("capacity_touches", "seq, pool_id, seg_idx")):
         out[t] = [tuple(r) for r in conn.execute(f"SELECT * FROM {t} ORDER BY {order}")]
     return out

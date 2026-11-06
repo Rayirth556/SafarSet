@@ -65,6 +65,7 @@ async def vacancy(request: Request, vehicle_id: str, body: models.VacancyBody):
     st = _st(request)
     _vehicle(st, vehicle_id)
     ts = body.ts_sim if body.ts_sim is not None else st.clock
-    payload = {"pool_id": body.pool_id, "from_seg": body.from_seg, "to_seg": body.to_seg, "vacancy": body.vacancy, "reported_by": "field view (HHT)"}
+    payload = {"pool_id": body.pool_id, "from_seg": body.from_seg, "to_seg": body.to_seg, "vacancy": body.vacancy,
+               "observed_at": body.observed_at, "reported_by": "field view (HHT)"}
     res = await st.mutate(lambda: st.engine.handle("VACANCY_UPDATE", "field", payload, ts))
     return {"seq": res.seq, "batch_id": res.batch_id}

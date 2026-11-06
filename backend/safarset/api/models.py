@@ -18,6 +18,11 @@ class ApproveBody(_Body):
     ts_sim: int | None = None
 
 
+class ConflictResolveBody(_Body):
+    note: str = Field(min_length=5)
+    ts_sim: int | None = None
+
+
 class RulesBody(_Body):
     weights: dict | None = None
     buffers: dict[str, float] | None = None
@@ -59,6 +64,7 @@ class VacancyBody(_Body):
     to_seg: int = Field(gt=0)
     vacancy: int = Field(ge=0)
     ts_sim: int | None = None
+    observed_at: int | None = Field(default=None, ge=0, le=2880)
 
 
 class LoadScenarioBody(_Body):
