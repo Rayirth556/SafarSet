@@ -1,3 +1,5 @@
+import { API_BASE } from './base'
+
 /** Thin fetch wrapper. Errors from the backend look like `{"detail": {"error", "kind", "fields?"}}`. */
 export interface FieldError { field: string; message: string }
 
@@ -22,7 +24,7 @@ export class ApiError extends Error {
 export async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   let res: Response
   try {
-    res = await fetch(path, {
+    res = await fetch(`${API_BASE}${path}`, {
       method,
       headers: body === undefined ? undefined : { 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),

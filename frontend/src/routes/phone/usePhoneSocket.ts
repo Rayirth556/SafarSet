@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { qk } from '@/live/invalidation'
+import { wsUrlFor } from '@/api/base'
 
 const BACKOFF_MS = [500, 1000, 2000, 4000, 5000]
 
@@ -20,7 +21,7 @@ export function usePhoneSocket(key: string, enabled: boolean) {
 
     const connect = () => {
       if (closed) return
-      ws = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws/phone/${encodeURIComponent(key)}`)
+      ws = new WebSocket(wsUrlFor(`/ws/phone/${encodeURIComponent(key)}`))
       ws.onopen = () => { attempt = 0 }
       ws.onmessage = refetch                       // 'history' on connect, 'sms' on every new message
       ws.onclose = () => { if (!closed) retry = setTimeout(connect, BACKOFF_MS[Math.min(attempt++, BACKOFF_MS.length - 1)]) }

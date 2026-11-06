@@ -1,0 +1,13 @@
+# Render Blueprint: the SafarSet backend (FastAPI, in-memory demo state, WebSocket /ws).
+# The frontend is deployed separately on Vercel (frontend/vercel.json) with VITE_API_BASE set to this service's URL.
+services:
+  - type: web
+    name: safarset-api
+    runtime: python
+    rootDir: .
+    buildCommand: pip install -r requirements.txt
+    startCommand: cd backend && uvicorn safarset.api.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8

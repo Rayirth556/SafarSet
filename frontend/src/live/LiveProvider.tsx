@@ -4,6 +4,7 @@ import type { AppState, Kpis, WsMessage } from '@/api/types'
 import { LiveContext, type LiveStatus } from './context'
 import { ALL_KEYS, keysForTopics, qk } from './invalidation'
 import { LiveRouter } from './router'
+import { wsUrlFor } from '@/api/base'
 
 
 const PING_MS = 20_000
@@ -11,7 +12,7 @@ const STALE_MS = 45_000
 const BACKOFF_MS = [500, 1000, 2000, 4000, 5000]
 
 function wsUrl() {
-  return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`
+  return wsUrlFor('/ws')
 }
 
 /** One shared `/ws` connection per page. Feeds the TanStack cache; components only read queries. */
